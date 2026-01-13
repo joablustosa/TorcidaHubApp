@@ -899,3 +899,127 @@ class PaymentEventApi {
     );
   }
 }
+
+// Modelo para Extra da API
+class ExtraApi {
+  final int id;
+  final String name;
+  final String? description;
+  final double value;
+  final int id_user_created;
+  final String? datetime_created;
+  final int id_enterprise;
+  final bool selected;
+  final int tenant_id;
+
+  ExtraApi({
+    this.id = 0,
+    required this.name,
+    this.description,
+    this.value = 0.0,
+    this.id_user_created = 0,
+    this.datetime_created,
+    this.id_enterprise = 0,
+    this.selected = false,
+    this.tenant_id = 0,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'value': value,
+      'id_user_created': id_user_created,
+      'datetime_created': datetime_created,
+      'id_enterprise': id_enterprise,
+      'selected': selected,
+      'tenant_id': tenant_id,
+    };
+  }
+
+  factory ExtraApi.fromJson(Map<String, dynamic> json) {
+    return ExtraApi(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      description: json['description'],
+      value: (json['value'] ?? 0).toDouble(),
+      id_user_created: json['id_user_created'] ?? 0,
+      datetime_created: json['datetime_created'],
+      id_enterprise: json['id_enterprise'] ?? 0,
+      selected: json['selected'] ?? false,
+      tenant_id: json['tenant_id'] ?? 0,
+    );
+  }
+}
+
+// Modelo para Tenant da API
+class TenantApi {
+  final int id;
+  final String? whatsapp;
+  // Adicionar outros campos conforme necessário
+  
+  TenantApi({
+    this.id = 0,
+    this.whatsapp,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'whatsapp': whatsapp,
+    };
+  }
+
+  factory TenantApi.fromJson(Map<String, dynamic> json) {
+    return TenantApi(
+      id: json['id'] ?? 0,
+      whatsapp: json['whatsapp'],
+    );
+  }
+}
+
+// Modelo para ExtraEvent da API
+class ExtraEventApi {
+  final int id;
+  final int id_event;
+  final int id_extra;
+  final int id_user_created;
+  final String? datetime_created;
+  final int id_enterprise;
+  final int tenant_id;
+
+  ExtraEventApi({
+    this.id = 0,
+    this.id_event = 0,
+    this.id_extra = 0,
+    this.id_user_created = 0,
+    this.datetime_created,
+    this.id_enterprise = 0,
+    this.tenant_id = 0,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'id_event': id_event,
+      'id_extra': id_extra,
+      'id_user_created': id_user_created,
+      'datetime_created': datetime_created,
+      'id_enterprise': id_enterprise,
+      'tenant_id': tenant_id,
+    };
+  }
+
+  factory ExtraEventApi.fromJson(Map<String, dynamic> json) {
+    return ExtraEventApi(
+      id: json['id'] ?? 0,
+      id_event: json['id_event'] ?? 0,
+      id_extra: json['id_extra'] ?? 0,
+      id_user_created: json['id_user_created'] ?? 0,
+      datetime_created: json['datetime_created'],
+      id_enterprise: json['id_enterprise'] ?? 0,
+      tenant_id: json['tenant_id'] ?? 0,
+    );
+  }
+}

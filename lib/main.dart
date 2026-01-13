@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/admin/login_screen.dart';
+import 'screens/admin/home_screen.dart';
+import 'screens/client/client_home_screen.dart';
 import 'services/auth_service.dart';
 
 void main() async {
@@ -81,12 +83,33 @@ class _AgendaDeFestaAppState extends State<AgendaDeFestaApp> {
     }
   }
 
+  String _getInitialRoute() {
+    final userType = widget.authService.userType;
+    if (userType == 2) {
+      return '/client-home';
+    } else if (userType == 8) {
+      return '/home';
+    }
+    // Padrão: admin home
+    return '/home';
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Doméstica +',
       navigatorKey: _navigatorKey,
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('pt', 'BR'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('pt', 'BR'),
       theme: ThemeData(
         primarySwatch: Colors.blue,
         primaryColor: Colors.blue,
@@ -100,10 +123,11 @@ class _AgendaDeFestaAppState extends State<AgendaDeFestaApp> {
           foregroundColor: Colors.white,
         ),
       ),
-      initialRoute: widget.authService.isAuthenticated ? '/home' : '/login',
+      initialRoute: widget.authService.isAuthenticated ? _getInitialRoute() : '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
+        '/client-home': (context) => const ClientHomeScreen(),
       },
     );
   }

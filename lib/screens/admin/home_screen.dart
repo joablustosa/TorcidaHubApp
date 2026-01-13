@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'calendar_screen.dart';
 import 'dashboard_screen.dart';
 import 'profile_screen.dart';
-import '../widgets/add_evento_sheet.dart';
+import '../../widgets/add_evento_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

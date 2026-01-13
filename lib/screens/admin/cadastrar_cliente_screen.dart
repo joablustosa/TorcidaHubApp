@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/api_models.dart';
-import '../services/cliente_service.dart';
+import '../../models/api_models.dart';
+import '../../services/cliente_service.dart';
 
 class CadastrarClienteScreen extends StatefulWidget {
   const CadastrarClienteScreen({super.key});

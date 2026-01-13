@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/api_models.dart';
-import '../services/movimentacao_service.dart';
-import '../services/cliente_service.dart';
-import '../services/api_service.dart';
+import '../../models/api_models.dart';
+import '../../services/movimentacao_service.dart';
+import '../../services/cliente_service.dart';
+import '../../services/api_service.dart';
+import '../../widgets/add_evento_sheet.dart';
 
 class EventPaymentsScreen extends StatefulWidget {
   final EventApi evento;
@@ -98,6 +99,70 @@ class _EventPaymentsScreenState extends State<EventPaymentsScreen> {
   double get _progresso {
     if (_valorEvento == 0) return 0.0;
     return (_totalPago / _valorEvento).clamp(0.0, 1.0);
+  }
+
+  Future<void> _deletarEvento() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Exclusão'),
+        content: const Text(
+            'Deseja realmente excluir este evento? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Deletar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar == true) {
+      try {
+        final apiService = ApiService();
+        await apiService.initialize();
+        final sucesso = await apiService.deleteEvent(widget.evento.id);
+
+        if (sucesso && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Evento deletado com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true); // Retorna true para indicar que foi deletado
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao deletar evento: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _editarEvento() async {
+    AddEventoSheet.showForEdit(
+      context,
+      evento: widget.evento,
+      onEventoUpdated: () {
+        // Recarregar dados após edição
+        _loadData();
+      },
+      onRefresh: () {
+        // Recarregar dados após edição
+        _loadData();
+      },
+    );
   }
 
   Future<void> _showAddPaymentDialog() async {
@@ -286,6 +351,40 @@ class _EventPaymentsScreenState extends State<EventPaymentsScreen> {
         title: const Text('Pagamentos do Evento'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) async {
+              if (value == 'edit') {
+                _editarEvento();
+              } else if (value == 'delete') {
+                _deletarEvento();
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('Editar'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Deletar'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

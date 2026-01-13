@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:agendadefesta/models/evento.dart';
 import 'package:agendadefesta/models/api_models.dart';
 import 'package:agendadefesta/services/cliente_service.dart';
-import '../services/evento_service.dart';
-import '../services/api_service.dart';
+import '../../services/evento_service.dart';
+import '../../services/api_service.dart';
 import 'event_payments_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -61,6 +61,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   double get _totalPendente {
     return _totalMes - _totalRecebido;
+  }
+
+  // Formatar valor monetário no formato brasileiro (R$ 1.234,56)
+  String _formatCurrency(double value) {
+    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(value);
   }
 
   @override
@@ -155,7 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: _buildSummaryCard(
                       'Total do Mês',
-                      'R\$ ${totalValue.toStringAsFixed(2)}',
+                      _formatCurrency(totalValue),
                       Icons.attach_money,
                       Colors.blue,
                     ),
@@ -164,7 +169,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: _buildSummaryCard(
                       'Total Recebido',
-                      'R\$ ${_totalRecebido.toStringAsFixed(2)}',
+                      _formatCurrency(_totalRecebido),
                       Icons.payments,
                       Colors.green,
                     ),
@@ -177,7 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: _buildSummaryCard(
                       'A Receber',
-                      'R\$ ${pendingValue.toStringAsFixed(2)}',
+                      _formatCurrency(pendingValue),
                       Icons.pending_actions,
                       Colors.orange,
                     ),
@@ -454,7 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'R\$ ${evento.valor.toStringAsFixed(2)}',
+                      _formatCurrency(evento.valor),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.blue,

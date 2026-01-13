@@ -812,6 +812,17 @@ class ApiService {
     }
   }
 
+  Future<bool> deleteEvent(int id) async {
+    try {
+      print('🗑️ === DELETANDO EVENTO ===');
+      print('ID: $id');
+      return await delete('/api/Events/v1/$id');
+    } catch (e) {
+      print('❌ Erro ao deletar evento: $e');
+      throw Exception('Erro ao deletar evento: $e');
+    }
+  }
+
   // USERS - SEMPRE autenticados
   Future<List<UserApi>> getUsers({int? userType}) async {
     try {
@@ -858,6 +869,24 @@ class ApiService {
     } catch (e) {
       print('Erro ao buscar usuário por ID: $e');
       throw Exception('Erro ao buscar usuário por ID: $e');
+    }
+  }
+
+  // TENANTS - SEMPRE autenticados
+  Future<TenantApi> getTenantById(int id) async {
+    try {
+      print('Buscando tenant por ID: $id');
+      final response = await get('/api/Tenants/v1/$id');
+      print('Tenant encontrado: $response (tipo: ${response.runtimeType})');
+
+      if (response is Map) {
+        return TenantApi.fromJson(Map<String, dynamic>.from(response));
+      } else {
+        throw Exception('Formato de resposta inesperado para tenant por ID');
+      }
+    } catch (e) {
+      print('Erro ao buscar tenant por ID: $e');
+      throw Exception('Erro ao buscar tenant por ID: $e');
     }
   }
 
@@ -971,6 +1000,64 @@ class ApiService {
     } catch (e) {
       print('❌ Erro ao buscar pagamentos: $e');
       throw Exception('Erro ao buscar pagamentos: $e');
+    }
+  }
+
+  // EXTRAS - SEMPRE autenticados
+  Future<List<ExtraApi>> getExtras() async {
+    try {
+      print('=== BUSCANDO EXTRAS ===');
+      print('Endpoint: /api/Extras/v1');
+
+      final response = await get('/api/Extras/v1');
+      print('Resposta: $response (tipo: ${response.runtimeType})');
+
+      List<dynamic> extras;
+      if (response is List) {
+        extras = response;
+      } else if (response is Map && response['data'] != null) {
+        extras = response['data'];
+      } else {
+        extras = [];
+      }
+
+      print('📊 Extras encontrados: ${extras.length}');
+
+      return extras
+          .map((json) => ExtraApi.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } catch (e) {
+      print('❌ Erro ao buscar extras: $e');
+      throw Exception('Erro ao buscar extras: $e');
+    }
+  }
+
+  // EXTRA EVENTS - SEMPRE autenticados
+  Future<ExtraEventApi> createExtraEvent(ExtraEventApi extraEvent) async {
+    try {
+      print('📝 === CRIANDO NOVO EXTRA EVENT ===');
+      print('Dados recebidos: ${extraEvent.toJson()}');
+
+      // Obter dados do usuário logado
+      final tenantId = _authService.tenantId ?? 0;
+      final idEnterprise = _authService.idEnterprise ?? 0;
+      final idUserCreate =
+          _authService.usuarioSessao ?? _authService.userId ?? 0;
+
+      final extraEventData = extraEvent.toJson();
+      extraEventData['tenant_id'] = tenantId;
+      extraEventData['id_enterprise'] = idEnterprise;
+      extraEventData['id_user_created'] = idUserCreate;
+      extraEventData['datetime_created'] = DateTime.now().toIso8601String();
+
+      print('📤 ExtraEvent completo para envio: $extraEventData');
+      final response = await post('/api/ExtraEvents/v1', extraEventData);
+      print('📥 Resposta da API: $response');
+
+      return ExtraEventApi.fromJson(Map<String, dynamic>.from(response));
+    } catch (e) {
+      print('❌ Erro ao criar extra event: $e');
+      throw Exception('Erro ao criar extra event: $e');
     }
   }
 

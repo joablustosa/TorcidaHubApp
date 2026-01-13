@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/api_models.dart';
-import '../services/evento_service.dart';
-import '../services/cliente_service.dart';
+import '../../models/api_models.dart';
+import '../../services/evento_service.dart';
+import '../../services/cliente_service.dart';
 
 class PaymentsScreen extends StatefulWidget {
   const PaymentsScreen({super.key});
@@ -82,6 +82,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     } catch (e) {
       return 'Endereço não disponível';
     }
+  }
+
+  // Formatar valor monetário no formato brasileiro (R$ 1.234,56)
+  String _formatCurrency(double value) {
+    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(value);
   }
 
   // Deletar pagamento (desmarcar como confirmado)
@@ -276,7 +281,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Total recebido: R\$ ${totalPago.toStringAsFixed(2)}',
+                          'Total recebido: ${_formatCurrency(totalPago)}',
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 16,
@@ -294,7 +299,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                       Expanded(
                         child: _buildSummaryCard(
                           'Este Mês',
-                          'R\$ ${esteMesPago.toStringAsFixed(2)}',
+                          _formatCurrency(esteMesPago),
                           Icons.calendar_today,
                           Colors.blue,
                         ),
@@ -529,7 +534,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
                 Text(
-                  'R\$ ${evento.total.toStringAsFixed(2)}',
+                  _formatCurrency(evento.total),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.green,

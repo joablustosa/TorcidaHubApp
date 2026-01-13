@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/api_models.dart';
-import '../services/cliente_service.dart';
-import '../services/evento_service.dart';
+import '../../models/api_models.dart';
+import '../../services/cliente_service.dart';
+import '../../services/evento_service.dart';
 import 'event_payments_screen.dart';
-import '../widgets/add_evento_sheet.dart';
+import '../../widgets/add_evento_sheet.dart';
 
 class DayDetailsScreen extends StatefulWidget {
   final DateTime selectedDay;
@@ -211,7 +211,7 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
                     ),
                     _buildInfoCard(
                       'Valor Total',
-                      'R\$ ${_getTotalValue().toStringAsFixed(2)}',
+                      _formatCurrency(_getTotalValue()),
                       Icons.attach_money,
                     ),
                     _buildInfoCard(
@@ -359,7 +359,7 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      'R\$ ${evento.total.toStringAsFixed(2)}',
+                                      _formatCurrency(evento.total),
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: (evento.status == 1)
@@ -417,6 +417,11 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
     return _eventos.fold(0.0, (sum, evento) => sum + evento.total);
   }
 
+  // Formatar valor monetário no formato brasileiro (R$ 1.234,56)
+  String _formatCurrency(double value) {
+    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(value);
+  }
+
   // Método auxiliar para fazer parse seguro de data
   DateTime _parseDateTime(String? dataString) {
     try {
@@ -450,6 +455,7 @@ class PaymentDialog extends StatefulWidget {
 class _PaymentDialogState extends State<PaymentDialog> {
   final _formKey = GlobalKey<FormState>();
   final _valorController = TextEditingController();
+  final _observacaoController = TextEditingController();
   String _formaPagamento = 'Dinheiro';
   final ClienteService _clienteService = ClienteService();
 
@@ -538,12 +544,13 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 border: OutlineInputBorder(),
                 prefixText: 'R\$ ',
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor, insira o valor';
                 }
-                if (double.tryParse(value) == null) {
+                final valor = double.tryParse(value.replaceAll(',', '.'));
+                if (valor == null || valor <= 0) {
                   return 'Por favor, insira um valor válido';
                 }
                 return null;
@@ -571,15 +578,30 @@ class _PaymentDialogState extends State<PaymentDialog> {
               items: const [
                 DropdownMenuItem(value: 'Dinheiro', child: Text('💵 Dinheiro')),
                 DropdownMenuItem(value: 'Pix', child: Text('📱 Pix')),
-                DropdownMenuItem(value: 'Crédito', child: Text('💳 Crédito')),
                 DropdownMenuItem(value: 'Débito', child: Text('💳 Débito')),
-                DropdownMenuItem(value: 'Outra', child: Text('🔗 Outra')),
+                DropdownMenuItem(value: 'Crédito', child: Text('💳 Crédito')),
+                DropdownMenuItem(value: 'Outro', child: Text('🔗 Outro')),
               ],
               onChanged: (value) {
                 setState(() {
                   _formaPagamento = value!;
                 });
               },
+            ),
+
+            const SizedBox(height: 24),
+
+            // Campo de Observação
+            TextFormField(
+              controller: _observacaoController,
+              decoration: const InputDecoration(
+                labelText: 'Observação',
+                hintText: 'Digite uma observação (opcional)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.note),
+              ),
+              maxLines: 3,
+              keyboardType: TextInputType.multiline,
             ),
           ],
         ),
@@ -594,7 +616,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              final valor = double.parse(_valorController.text);
+              final valor = double.parse(_valorController.text.replaceAll(',', '.'));
               widget.onPaymentConfirmed(valor, _formaPagamento);
             }
           },
@@ -611,6 +633,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   @override
   void dispose() {
     _valorController.dispose();
+    _observacaoController.dispose();
     super.dispose();
   }
 

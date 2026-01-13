@@ -4,11 +4,11 @@ import 'privacy_security_screen.dart';
 import 'payments_screen.dart';
 import 'help_support_screen.dart';
 import 'cadastrar_cliente_screen.dart';
-import '../services/auth_service.dart';
-import '../services/evento_service.dart';
-import '../services/cliente_service.dart';
-import '../services/usuario_service.dart';
-import '../models/api_models.dart';
+import '../../services/auth_service.dart';
+import '../../services/evento_service.dart';
+import '../../services/cliente_service.dart';
+import '../../services/usuario_service.dart';
+import '../../models/api_models.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

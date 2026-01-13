@@ -8,14 +8,18 @@ import '../services/api_service.dart';
 
 class AddEventoSheet extends StatefulWidget {
   final DateTime? initialDate;
+  final EventApi? evento; // Evento para edição
   final Function(Evento)? onEventoSaved;
   final Function()? onRefresh;
+  final Function()? onEventoUpdated;
 
   const AddEventoSheet({
     super.key,
     this.initialDate,
+    this.evento,
     this.onEventoSaved,
     this.onRefresh,
+    this.onEventoUpdated,
   });
 
   @override
@@ -38,11 +42,33 @@ class AddEventoSheet extends StatefulWidget {
       ),
     );
   }
+
+  static void showForEdit(
+    BuildContext context, {
+    required EventApi evento,
+    Function()? onEventoUpdated,
+    Function()? onRefresh,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AddEventoSheet(
+        evento: evento,
+        onEventoUpdated: onEventoUpdated,
+        onRefresh: onRefresh,
+      ),
+    );
+  }
 }
 
 class _AddEventoSheetState extends State<AddEventoSheet> {
   final _formKey = GlobalKey<FormState>();
   final _valorController = TextEditingController();
+  final _birthdayPersonOneController = TextEditingController();
+  final _ageBirthdayPersonOneController = TextEditingController();
+  final _signalOneController = TextEditingController();
+  final _packageController = TextEditingController();
   DateTime _selectedDateInicio = DateTime.now();
   TimeOfDay _selectedTimeInicio = TimeOfDay.now();
   DateTime _selectedDateFim = DateTime.now();
@@ -53,16 +79,54 @@ class _AddEventoSheetState extends State<AddEventoSheet> {
   List<UserApi> _clientes = [];
   bool _isLoadingClientes = true;
   bool _isSaving = false;
+  String _signalPayment = 'Dinheiro';
   final ClienteService _clienteService = ClienteService();
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialDate != null) {
+    if (widget.evento != null) {
+      // Modo de edição - carregar dados do evento
+      _loadEventoData();
+    } else if (widget.initialDate != null) {
       _selectedDateInicio = widget.initialDate!;
       _selectedDateFim = widget.initialDate!;
     }
     _loadClientes();
+  }
+
+  void _loadEventoData() {
+    if (widget.evento == null) return;
+
+    final evento = widget.evento!;
+    
+    // Carregar valores nos controllers
+    _valorController.text = evento.total.toStringAsFixed(2).replaceAll('.', ',');
+    _birthdayPersonOneController.text = evento.birthday_person_one ?? '';
+    _ageBirthdayPersonOneController.text = evento.age_birthday_person_one > 0 
+        ? evento.age_birthday_person_one.toString() 
+        : '';
+    _signalOneController.text = evento.signalOne > 0 
+        ? evento.signalOne.toStringAsFixed(2).replaceAll('.', ',') 
+        : '';
+    _packageController.text = evento.package ?? '';
+    _signalPayment = evento.signal_payment ?? 'Dinheiro';
+
+    // Carregar datas e horas
+    try {
+      if (evento.hour_event != null) {
+        final dataHoraInicio = DateTime.parse(evento.hour_event!);
+        _selectedDateInicio = dataHoraInicio;
+        _selectedTimeInicio = TimeOfDay.fromDateTime(dataHoraInicio);
+      }
+      if (evento.hour_end != null) {
+        final dataHoraFim = DateTime.parse(evento.hour_end!);
+        _selectedDateFim = dataHoraFim;
+        _selectedTimeFim = TimeOfDay.fromDateTime(dataHoraFim);
+      }
+    } catch (e) {
+      print('Erro ao parsear datas: $e');
+    }
   }
 
   Future<void> _loadClientes() async {
@@ -73,6 +137,13 @@ class _AddEventoSheetState extends State<AddEventoSheet> {
       setState(() {
         _clientes = clientes;
         _isLoadingClientes = false;
+        // Se estiver em modo de edição, definir o cliente selecionado
+        if (widget.evento != null && _clienteSelecionado == null) {
+          _clienteSelecionado = clientes.firstWhere(
+            (c) => c.id == widget.evento!.id_client,
+            orElse: () => clientes.first,
+          );
+        }
       });
       print('✅ Clientes carregados para select: ${_clientes.length}');
     } catch (e) {
@@ -116,9 +187,9 @@ class _AddEventoSheetState extends State<AddEventoSheet> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Novo Evento',
-                        style: TextStyle(
+                      Text(
+                        widget.evento != null ? 'Editar Evento' : 'Novo Evento',
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue,
@@ -214,6 +285,94 @@ class _AddEventoSheetState extends State<AddEventoSheet> {
                             }
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 16),
+                        // Campo Nome do Aniversariante
+                        TextFormField(
+                          controller: _birthdayPersonOneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Nome do Aniversariante',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person, color: Colors.blue),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Campo Idade do Aniversariante
+                        TextFormField(
+                          controller: _ageBirthdayPersonOneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Idade do Aniversariante',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.cake, color: Colors.blue),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value != null && value.isNotEmpty) {
+                              if (int.tryParse(value) == null) {
+                                return 'Por favor, insira uma idade válida';
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Campo Sinal (Entrada)
+                        TextFormField(
+                          controller: _signalOneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Sinal (Entrada)',
+                            border: OutlineInputBorder(),
+                            prefixIcon:
+                                Icon(Icons.payment, color: Colors.blue),
+                            prefixText: 'R\$ ',
+                          ),
+                          keyboardType:
+                              TextInputType.numberWithOptions(decimal: true),
+                          validator: (value) {
+                            if (value != null && value.isNotEmpty) {
+                              if (double.tryParse(value.replaceAll(',', '.')) ==
+                                  null) {
+                                return 'Por favor, insira um valor válido';
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Campo Forma de Pagamento
+                        DropdownButtonFormField<String>(
+                          value: _signalPayment,
+                          decoration: const InputDecoration(
+                            labelText: 'Forma de Pagamento',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.payment, color: Colors.blue),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'Dinheiro', child: Text('Dinheiro')),
+                            DropdownMenuItem(value: 'Pix', child: Text('Pix')),
+                            DropdownMenuItem(
+                                value: 'Crédito', child: Text('Crédito')),
+                            DropdownMenuItem(
+                                value: 'Débito', child: Text('Débito')),
+                            DropdownMenuItem(value: 'Outro', child: Text('Outro')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _signalPayment = value!;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Campo Pacote
+                        TextFormField(
+                          controller: _packageController,
+                          decoration: const InputDecoration(
+                            labelText: 'Pacote',
+                            hintText: 'Digite o nome do pacote',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.inventory, color: Colors.blue),
+                          ),
                         ),
                         const SizedBox(height: 24),
                         // Data e Hora de Início
@@ -458,9 +617,9 @@ class _AddEventoSheetState extends State<AddEventoSheet> {
                                         Colors.white),
                                   ),
                                 )
-                              : const Text(
-                                  'Adicionar Evento',
-                                  style: TextStyle(
+                              : Text(
+                                  widget.evento != null ? 'Salvar Alterações' : 'Adicionar Evento',
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -521,51 +680,143 @@ class _AddEventoSheetState extends State<AddEventoSheet> {
       await authService.initialize();
       final userId = authService.userId ?? 0;
 
-      // Criar EventApi com os dados do formulário
+      // Criar ou atualizar EventApi com os dados do formulário
+      final signalOneValue = _signalOneController.text.isNotEmpty
+          ? double.parse(_signalOneController.text.replaceAll(',', '.'))
+          : 0.0;
+      final ageBirthdayPersonOne = _ageBirthdayPersonOneController.text.isNotEmpty
+          ? int.parse(_ageBirthdayPersonOneController.text)
+          : 0;
 
-      final evento = EventApi(
-        id: 0,
-        id_client: _clienteSelecionado!.id,
-        date_event: dataHoraInicio.toIso8601String(),
-        hour_event: dataHoraInicio.toIso8601String(),
-        hour_end: dataHoraFim.toIso8601String(),
-        total: double.parse(_valorController.text.replaceAll(',', '.')),
-        id_user_create: authService.usuarioSessao ?? userId,
-        datetime_create: DateTime.now().toIso8601String(),
-        status: 0, // Não confirmado
-        id_enterprise: authService.idEnterprise ?? 0,
-        tenant_id: authService.tenantId ?? 0,
-      );
+      final eventoOriginal = widget.evento;
+      final isEditing = eventoOriginal != null;
+
+      EventApi evento;
+      if (isEditing) {
+        // Modo de edição - manter dados originais
+        final original = eventoOriginal!;
+        evento = EventApi(
+          id: original.id,
+          id_client: _clienteSelecionado!.id,
+          date_event: dataHoraInicio.toIso8601String(),
+          hour_event: dataHoraInicio.toIso8601String(),
+          hour_end: dataHoraFim.toIso8601String(),
+          total: double.parse(_valorController.text.replaceAll(',', '.')),
+          id_user_create: eventoOriginal.id_user_create,
+          datetime_create: eventoOriginal.datetime_create,
+          datetime_status: DateTime.now().toIso8601String(),
+          status: eventoOriginal.status,
+          id_enterprise: eventoOriginal.id_enterprise,
+          tenant_id: eventoOriginal.tenant_id,
+          birthday_person_one: _birthdayPersonOneController.text.isNotEmpty
+              ? _birthdayPersonOneController.text
+              : '',
+          age_birthday_person_one: ageBirthdayPersonOne,
+          birthday_person_two: eventoOriginal.birthday_person_two,
+          age_birthday_person_two: eventoOriginal.age_birthday_person_two,
+          beer_brand: eventoOriginal.beer_brand,
+          cake: eventoOriginal.cake,
+          filling: eventoOriginal.filling,
+          candy: eventoOriginal.candy,
+          broth: eventoOriginal.broth,
+          theme: eventoOriginal.theme,
+          image_theme: eventoOriginal.image_theme,
+          music: eventoOriginal.music,
+          theme_description: eventoOriginal.theme_description,
+          color_balloons: eventoOriginal.color_balloons,
+          signalOne: signalOneValue,
+          signal_payment: _signalPayment,
+          father_name: eventoOriginal.father_name,
+          mother_name: eventoOriginal.mother_name,
+          package: _packageController.text.isNotEmpty
+              ? _packageController.text
+              : eventoOriginal.package,
+          local_view: eventoOriginal.local_view,
+        );
+      } else {
+        // Modo de criação
+        evento = EventApi(
+          id: 0,
+          id_client: _clienteSelecionado!.id,
+          date_event: dataHoraInicio.toIso8601String(),
+          hour_event: dataHoraInicio.toIso8601String(),
+          hour_end: dataHoraFim.toIso8601String(),
+          total: double.parse(_valorController.text.replaceAll(',', '.')),
+          id_user_create: authService.usuarioSessao ?? userId,
+          datetime_create: DateTime.now().toIso8601String(),
+          datetime_status: DateTime.now().toIso8601String(),
+          status: 1,
+          id_enterprise: authService.idEnterprise ?? 0,
+          tenant_id: authService.tenantId ?? 0,
+          birthday_person_one: _birthdayPersonOneController.text.isNotEmpty
+              ? _birthdayPersonOneController.text
+              : '',
+          age_birthday_person_one: ageBirthdayPersonOne,
+          birthday_person_two: null,
+          age_birthday_person_two: 0,
+          beer_brand: 'Escolher depois',
+          cake: 'Escolher depois',
+          filling: 'Escolher depois',
+          candy: 'Escolher depois',
+          broth: 'Escolher depois',
+          theme: 'Escolher depois',
+          image_theme: 'Escolher depois',
+          music: '-',
+          theme_description: 'Escolher depois',
+          color_balloons: '',
+          signalOne: signalOneValue,
+          signal_payment: _signalPayment,
+          father_name: 'Preencher depois',
+          mother_name: 'Preencher depois',
+          package: _packageController.text.isNotEmpty
+              ? _packageController.text
+              : null,
+          local_view: 'App',
+        );
+      }
 
       final apiService = ApiService();
       await apiService.initialize();
-      final novoEvento = await apiService.createEvent(evento);
+      
+      EventApi eventoAtualizado;
+      if (isEditing) {
+        final original = eventoOriginal!;
+        eventoAtualizado = await apiService.updateEvent(original.id, evento);
+      } else {
+        eventoAtualizado = await apiService.createEvent(evento);
+      }
 
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Evento adicionado com sucesso!'),
+          SnackBar(
+            content: Text(isEditing 
+                ? 'Evento atualizado com sucesso!' 
+                : 'Evento adicionado com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
 
-        if (widget.onEventoSaved != null) {
+        if (isEditing && widget.onEventoUpdated != null) {
+          widget.onEventoUpdated!();
+        }
+
+        if (!isEditing && widget.onEventoSaved != null) {
           // Converter EventApi para Evento para compatibilidade
           final eventoCompat = Evento(
-            id: novoEvento.id,
+            id: eventoAtualizado.id,
             data_hora_criacao:
-                novoEvento.datetime_create ?? DateTime.now().toIso8601String(),
-            id_usuario_criacao: novoEvento.id_user_create,
-            id_usuario: novoEvento.id_user_create,
-            id_cliente: novoEvento.id_client,
-            valor: novoEvento.total,
-            data_hora_inicio: novoEvento.hour_event ??
-                novoEvento.date_event ??
+                eventoAtualizado.datetime_create ?? DateTime.now().toIso8601String(),
+            id_usuario_criacao: eventoAtualizado.id_user_create,
+            id_usuario: eventoAtualizado.id_user_create,
+            id_cliente: eventoAtualizado.id_client,
+            valor: eventoAtualizado.total,
+            data_hora_inicio: eventoAtualizado.hour_event ??
+                eventoAtualizado.date_event ??
                 DateTime.now().toIso8601String(),
             data_hora_fim:
-                novoEvento.hour_end ?? DateTime.now().toIso8601String(),
-            confirmado: novoEvento.status == 1,
+                eventoAtualizado.hour_end ?? DateTime.now().toIso8601String(),
+            confirmado: eventoAtualizado.status == 1,
             prioridade: 0,
             deletado: false,
           );
@@ -597,6 +848,10 @@ class _AddEventoSheetState extends State<AddEventoSheet> {
   @override
   void dispose() {
     _valorController.dispose();
+    _birthdayPersonOneController.dispose();
+    _ageBirthdayPersonOneController.dispose();
+    _signalOneController.dispose();
+    _packageController.dispose();
     super.dispose();
   }
 }

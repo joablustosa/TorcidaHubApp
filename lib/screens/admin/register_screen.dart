@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import '../models/api_models.dart';
+import '../../services/api_service.dart';
+import '../../models/api_models.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});

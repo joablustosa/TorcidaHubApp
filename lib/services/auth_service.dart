@@ -15,6 +15,7 @@ class AuthService {
   static const String _idEnterpriseKey = 'id_enterprise';
   static const String _usuarioSessaoKey = 'usuario_sessao';
   static const String _userStatusKey = 'user_status';
+  static const String _userTypeKey = 'user_type';
   static const String _baseUrl =
       'https://festaproapi-b3gtbuaegjbucyap.canadacentral-01.azurewebsites.net';
 
@@ -36,6 +37,7 @@ class AuthService {
   int? _idEnterprise;
   int? _usuarioSessao;
   int? _userStatus;
+  int? _userType;
 
   VoidCallback? _onTokenInvalid;
 
@@ -45,6 +47,7 @@ class AuthService {
   int? get idEnterprise => _idEnterprise;
   int? get usuarioSessao => _usuarioSessao;
   int? get userStatus => _userStatus;
+  int? get userType => _userType;
   bool get isAuthenticated => _token != null && !_isTokenExpired();
 
   bool _isTokenExpired() {
@@ -95,6 +98,7 @@ class AuthService {
       _idEnterprise = prefs.getInt(_idEnterpriseKey);
       _usuarioSessao = prefs.getInt(_usuarioSessaoKey);
       _userStatus = prefs.getInt(_userStatusKey);
+      _userType = prefs.getInt(_userTypeKey);
 
       final expiryString = prefs.getString(_tokenExpiryKey);
       if (expiryString != null) {
@@ -128,6 +132,9 @@ class AuthService {
       }
       if (_userStatus != null) {
         await prefs.setInt(_userStatusKey, _userStatus!);
+      }
+      if (_userType != null) {
+        await prefs.setInt(_userTypeKey, _userType!);
       }
     } catch (e) {
       print('Erro ao salvar dados de autenticação: $e');
@@ -174,6 +181,10 @@ class AuthService {
           await _decodeAndSaveTokenData(loginResponse.accessToken);
           
           await _setAuthData(loginResponse);
+          
+          // Buscar userType após login bem-sucedido
+          await _fetchUserType();
+          
           // Salvar credenciais se solicitado
           if (saveCredentials) {
             await this.saveCredentials(email, senha, true);
@@ -331,6 +342,43 @@ class AuthService {
     print('Dados de autenticação salvos no storage');
   }
 
+  // Buscar userType do usuário via API
+  Future<void> _fetchUserType() async {
+    try {
+      if (_userId == null) {
+        print('⚠️ UserId não disponível para buscar userType');
+        return;
+      }
+
+      print('🔍 Buscando userType para userId: $_userId');
+      
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/Users/v1/$_userId'),
+        headers: getAuthHeaders(),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout ao buscar userType');
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final userData = json.decode(response.body) as Map<String, dynamic>;
+        _userType = userData['userType'] != null 
+            ? int.tryParse(userData['userType'].toString()) 
+            : null;
+        
+        print('✅ UserType obtido: $_userType');
+        await _saveToStorage();
+      } else {
+        print('⚠️ Erro ao buscar userType: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erro ao buscar userType: $e');
+      // Não falha o login se não conseguir buscar userType
+    }
+  }
+
   Future<void> logout() async {
     _token = null;
     _userId = null;
@@ -339,6 +387,7 @@ class AuthService {
     _idEnterprise = null;
     _usuarioSessao = null;
     _userStatus = null;
+    _userType = null;
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -349,6 +398,7 @@ class AuthService {
       await prefs.remove(_idEnterpriseKey);
       await prefs.remove(_usuarioSessaoKey);
       await prefs.remove(_userStatusKey);
+      await prefs.remove(_userTypeKey);
 
       // Verificar se deve manter credenciais salvas
       final rememberMe = prefs.getBool(_rememberMeKey) ?? false;

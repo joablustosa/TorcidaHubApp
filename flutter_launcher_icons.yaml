@@ -1,0 +1,10 @@
+# Ícone do app (atalho na tela inicial) - apenas launcher icon
+# 1) Logo maior no atalho: adaptive_icon_foreground_inset 0 = menos margem = logo ocupa mais espaço
+# 2) Cor de fundo que combina com a logo (verde claro) e não embola a visualização
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#E8F5E9"
+  adaptive_icon_foreground: "assets/logo.png"
+  adaptive_icon_foreground_inset: 0

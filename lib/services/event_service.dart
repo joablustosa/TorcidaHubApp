@@ -194,6 +194,10 @@ class EventService {
 
       return null;
     } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('23505') || msg.toLowerCase().contains('duplicate key')) {
+        throw Exception('ALREADY_REGISTERED');
+      }
       print('Erro ao se inscrever no evento: $e');
       rethrow;
     }

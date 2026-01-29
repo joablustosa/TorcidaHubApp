@@ -11,6 +11,8 @@ class EventCard extends StatelessWidget {
   final VoidCallback? onCancelRegistration;
   final VoidCallback? onViewDetails;
   final bool loading;
+  /// Sobrescreve event.userRegistered (ex.: após inscrever/cancelar sem recarregar a tela).
+  final bool? overrideUserRegistered;
 
   const EventCard({
     super.key,
@@ -20,24 +22,38 @@ class EventCard extends StatelessWidget {
     this.onCancelRegistration,
     this.onViewDetails,
     this.loading = false,
+    this.overrideUserRegistered,
   });
 
   String _formatDate(DateTime date) {
-    return DateFormat('dd/MM/yyyy HH:mm', 'pt_BR').format(date);
+    return DateFormat('dd/MM • HH:mm', 'pt_BR').format(date);
+  }
+
+  String _formatRelativeDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = date.difference(DateTime(now.year, now.month, now.day));
+    if (diff.inDays == 0) {
+      return 'Hoje • ${DateFormat('HH:mm').format(date)}';
+    }
+    if (diff.inDays == 1) return 'Amanhã • ${DateFormat('HH:mm').format(date)}';
+    if (diff.inDays > 1 && diff.inDays <= 7) {
+      return 'Em ${diff.inDays} dias • ${DateFormat('dd/MM HH:mm').format(date)}';
+    }
+    return _formatDate(date);
   }
 
   IconData _getEventTypeIcon(String eventType) {
     switch (eventType) {
       case 'game':
-        return Icons.sports_soccer;
+        return Icons.sports_soccer_rounded;
       case 'travel':
-        return Icons.directions_bus;
+        return Icons.directions_bus_rounded;
       case 'meeting':
-        return Icons.people;
+        return Icons.groups_rounded;
       case 'party':
-        return Icons.celebration;
+        return Icons.celebration_rounded;
       default:
-        return Icons.event;
+        return Icons.event_rounded;
     }
   }
 
@@ -52,62 +68,129 @@ class EventCard extends StatelessWidget {
       case 'party':
         return 'Festa';
       default:
-        return 'Outro';
+        return 'Evento';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final userRegistered = overrideUserRegistered ?? event.userRegistered;
     final isPast = event.eventDate.isBefore(DateTime.now());
     final isDeadlinePassed = event.registrationDeadline != null &&
         event.registrationDeadline!.isBefore(DateTime.now());
     final isFull = event.maxParticipants != null &&
         event.registrationsCount >= event.maxParticipants!;
-    final canRegister = !isPast && !isDeadlinePassed && !isFull && !event.userRegistered;
-    final canCancel = event.userRegistered &&
+    final canRegister = !isPast && !isDeadlinePassed && !isFull && !userRegistered;
+    final canCancel = userRegistered &&
         event.userRegistrationStatus != 'checked_in' &&
         !isPast;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: AppColors.textSecondary.withOpacity(0.12),
+        ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onViewDetails,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Imagem do evento
-            if (event.imageUrl != null)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12),
-                ),
-                child: CachedNetworkImage(
-                  imageUrl: event.imageUrl!,
-                  height: 180,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    height: 180,
-                    color: AppColors.background,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
+            if (event.imageUrl != null && event.imageUrl!.isNotEmpty)
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 160,
+                    width: double.infinity,
+                    child: CachedNetworkImage(
+                      imageUrl: event.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        height: 160,
+                        color: AppColors.background,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => _buildImagePlaceholder(160),
+                    ),
+                  ),
+                  if (isPast)
+                    Container(
+                      height: 160,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                      ),
+                    ),
+                  // Chip tipo no canto
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getEventTypeIcon(event.eventType),
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _getEventTypeLabel(event.eventType),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  errorWidget: (context, url, error) => Container(
-                    height: 180,
-                    color: AppColors.background,
-                    child: Icon(
-                      Icons.event,
-                      size: 48,
-                      color: AppColors.textSecondary,
-                    ),
+                ],
+              )
+            else
+              Container(
+                height: 100,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.15),
+                      AppColors.primary.withOpacity(0.06),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    _getEventTypeIcon(event.eventType),
+                    size: 44,
+                    color: AppColors.primary.withOpacity(0.6),
                   ),
                 ),
               ),
@@ -117,126 +200,49 @@ class EventCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Tipo e título
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getEventTypeIcon(event.eventType),
-                          size: 20,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getEventTypeLabel(event.eventType),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            Text(
-                              event.title,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Informações
-                  if (event.location != null) ...[
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            event.location!,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
+                  Text(
+                    event.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
-                    const SizedBox(height: 8),
-                  ],
-
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDate(event.eventDate),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 12),
 
+                  // Data (destaque: relativa se futuro)
+                  _buildInfoRow(
+                    Icons.calendar_today_rounded,
+                    isPast ? _formatDate(event.eventDate) : _formatRelativeDate(event.eventDate),
+                  ),
+                  if (event.location != null && event.location!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.location_on_rounded, event.location!),
+                  ],
                   if (event.maxParticipants != null) ...[
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.people,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${event.registrationsCount}/${event.maxParticipants} inscritos',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                    _buildInfoRow(
+                      Icons.people_rounded,
+                      '${event.registrationsCount}/${event.maxParticipants} inscritos',
                     ),
                   ],
-
                   if (event.isPaid) ...[
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Icon(
-                          Icons.attach_money,
-                          size: 16,
-                          color: AppColors.textSecondary,
+                          Icons.payments_rounded,
+                          size: 18,
+                          color: AppColors.primary,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'R\$ ${event.price.toStringAsFixed(2)}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.primary,
                           ),
                         ),
@@ -246,7 +252,7 @@ class EventCard extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Botões de ação
+                  // Ações / status
                   if (canRegister)
                     SizedBox(
                       width: double.infinity,
@@ -255,27 +261,30 @@ class EventCard extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.textLight,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                         child: loading
                             ? const SizedBox(
-                                height: 16,
-                                width: 16,
+                                height: 20,
+                                width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
+                                  color: Colors.white,
                                 ),
                               )
                             : const Text('Inscrever-se'),
                       ),
                     )
-                  else if (event.userRegistered) ...[
+                  else if (userRegistered) ...[
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: AppColors.success.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: AppColors.success.withOpacity(0.3),
                         ),
@@ -283,23 +292,28 @@ class EventCard extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.check_circle,
+                            Icons.check_circle_rounded,
                             color: AppColors.success,
-                            size: 20,
+                            size: 22,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
+                          const SizedBox(width: 10),
+                          const Expanded(
                             child: Text(
                               'Você está inscrito',
                               style: TextStyle(
                                 color: AppColors.success,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
                               ),
                             ),
                           ),
                           if (canCancel)
                             TextButton(
                               onPressed: onCancelRegistration,
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                              ),
                               child: const Text('Cancelar'),
                             ),
                         ],
@@ -307,38 +321,22 @@ class EventCard extends StatelessWidget {
                     ),
                   ]
                   else if (isFull)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.warning,
-                            color: AppColors.warning,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text('Evento lotado'),
-                        ],
-                      ),
+                    _buildStatusChip(
+                      Icons.person_off_rounded,
+                      'Evento lotado',
+                      AppColors.warning,
                     )
                   else if (isPast)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.textSecondary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.event_busy, size: 20),
-                          SizedBox(width: 8),
-                          Text('Evento encerrado'),
-                        ],
-                      ),
+                    _buildStatusChip(
+                      Icons.event_busy_rounded,
+                      'Evento encerrado',
+                      AppColors.textSecondary,
+                    )
+                  else if (isDeadlinePassed)
+                    _buildStatusChip(
+                      Icons.schedule_rounded,
+                      'Inscrições encerradas',
+                      AppColors.textSecondary,
                     ),
                 ],
               ),
@@ -348,5 +346,61 @@ class EventCard extends StatelessWidget {
       ),
     );
   }
-}
 
+  Widget _buildImagePlaceholder(double height) {
+    return Container(
+      height: height,
+      color: AppColors.background,
+      child: Icon(
+        Icons.event_rounded,
+        size: 48,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: AppColors.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

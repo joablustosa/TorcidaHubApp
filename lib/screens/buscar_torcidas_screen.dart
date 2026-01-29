@@ -3,6 +3,7 @@ import '../services/auth_service_supabase.dart';
 import '../services/supabase_service.dart';
 import '../models/supabase_models.dart';
 import '../constants/app_colors.dart';
+import '../widgets/torcida_hub_bottom_nav.dart';
 import 'minha_torcida_screen.dart';
 import 'entrar_torcida_screen.dart';
 
@@ -161,6 +162,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
         const SnackBar(
           content: Text('Você precisa estar logado para entrar em uma torcida'),
           backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -180,6 +182,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
         const SnackBar(
           content: Text('Esta torcida não permite entrada direta'),
           backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -216,6 +219,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
           SnackBar(
             content: Text('Você entrou na ${club.name}!'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
 
@@ -231,6 +235,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
           SnackBar(
             content: Text('Erro ao entrar na torcida: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -249,6 +254,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
         const SnackBar(
           content: Text('Você precisa estar logado para solicitar entrada'),
           backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -271,6 +277,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
           const SnackBar(
             content: Text('Solicitação enviada! Aguarde aprovação do administrador.'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         await _fetchPendingRequests();
@@ -281,6 +288,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
           SnackBar(
             content: Text('Erro ao solicitar entrada: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -462,25 +470,50 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text('Buscar Torcidas e Times'),
-        backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textLight,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.primary],
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [
-          // Barra de busca
+          // Barra de busca – estilo dashboard
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Buscar por nome, time ou cidade...',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.primary.withOpacity(0.8),
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: AppColors.textSecondary.withOpacity(0.2),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
                 ),
                 filled: true,
                 fillColor: AppColors.background,
@@ -488,9 +521,9 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
             ),
           ),
 
-          // Abas
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          // Abas – chip style
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
                 Expanded(
@@ -522,7 +555,7 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
                         onRefresh: _loadData,
                         color: AppColors.primary,
                         child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                           itemCount: _fanClubs.length,
                           itemBuilder: (context, index) {
                             return _buildFanClubCard(_fanClubs[index]);
@@ -531,6 +564,10 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
                       ),
           ),
         ],
+      ),
+      bottomNavigationBar: TorcidaHubBottomNav(
+        currentIndex: 1,
+        onTap: (index) => TorcidaHubBottomNav.navigateTo(context, index, 1),
       ),
     );
   }
@@ -545,25 +582,34 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
         _loadData();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: isActive
+              ? AppColors.primary
+              : AppColors.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: isActive
+              ? null
+              : Border.all(
+                  color: AppColors.textSecondary.withOpacity(0.15),
+                ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
-              size: 16,
+              size: 18,
               color: isActive ? AppColors.textLight : AppColors.textSecondary,
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
+                fontSize: 13,
                 color: isActive ? AppColors.textLight : AppColors.textSecondary,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
           ],
@@ -576,13 +622,16 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
     final modeInfo = _getJoinModeLabel(club);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 18),
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: AppColors.textSecondary.withOpacity(0.12),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -797,32 +846,33 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 64,
-              height: 64,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(32),
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
-                Icons.search,
-                size: 32,
-                color: AppColors.textSecondary,
+                Icons.search_rounded,
+                size: 40,
+                color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               _searchController.text.trim().isNotEmpty
                   ? 'Nenhum resultado encontrado'
                   : 'Busque por torcidas ou times',
               style: const TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
@@ -833,16 +883,24 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
               style: TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
+                height: 1.35,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const EntrarTorcidaScreen()),
                 );
               },
-              icon: const Icon(Icons.confirmation_number),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                side: BorderSide(color: AppColors.primary.withOpacity(0.6)),
+              ),
+              icon: const Icon(Icons.confirmation_number_rounded, size: 20),
               label: const Text('Tenho um código de convite'),
             ),
           ],

@@ -15,6 +15,8 @@ class PostCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onComment;
   final bool showComments;
+  /// Quando false, não envolve em Card (para ser usado dentro de um Card único com comentários).
+  final bool embedInCard;
 
   const PostCard({
     super.key,
@@ -28,6 +30,7 @@ class PostCard extends StatelessWidget {
     this.onEdit,
     this.onComment,
     this.showComments = false,
+    this.embedInCard = true,
   });
 
   String _formatDate(DateTime date) {
@@ -55,20 +58,12 @@ class PostCard extends StatelessWidget {
     final isEdited = post.updatedAt != null &&
         post.updatedAt!.isAfter(post.createdAt);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: post.isPinned
-            ? const BorderSide(color: AppColors.primary, width: 2)
-            : BorderSide.none,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Padding(
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Header
+        Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
@@ -323,7 +318,22 @@ class PostCard extends StatelessWidget {
             ),
           ),
         ],
+      );
+
+    if (!embedInCard) {
+      return content;
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: post.isPinned
+            ? const BorderSide(color: AppColors.primary, width: 2)
+            : BorderSide.none,
       ),
+      child: content,
     );
   }
 }

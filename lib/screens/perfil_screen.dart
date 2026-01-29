@@ -5,6 +5,7 @@ import '../services/auth_service_supabase.dart';
 import '../services/supabase_service.dart';
 import '../models/supabase_models.dart';
 import '../constants/app_colors.dart';
+import '../widgets/torcida_hub_bottom_nav.dart';
 import 'auth/login_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -99,6 +100,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
         SnackBar(
           content: Text('Erro ao selecionar imagem: ${e.toString()}'),
           backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -147,6 +149,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           const SnackBar(
             content: Text('Foto atualizada com sucesso!'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         _loadProfile();
@@ -160,6 +163,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           SnackBar(
             content: Text('Erro ao enviar foto: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -199,6 +203,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           const SnackBar(
             content: Text('Perfil atualizado com sucesso!'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         _loadProfile();
@@ -209,6 +214,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           SnackBar(
             content: Text('Erro ao salvar perfil: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -253,17 +259,30 @@ class _PerfilScreenState extends State<PerfilScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Meu Perfil'),
-        backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textLight,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.primary],
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         child: Form(
           key: _formKey,
           child: Column(
             children: [
-              // Avatar
+              // Avatar – estilo dashboard
               Stack(
                 children: [
                   CircleAvatar(
@@ -333,13 +352,26 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ],
               const SizedBox(height: 24),
 
-              // Formulário
+              // Formulário – estilo dashboard
               TextFormField(
                 controller: _nameController,
                 decoration: InputDecoration(
                   labelText: 'Nome Completo *',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
@@ -359,13 +391,26 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   labelText: 'Apelido',
                   hintText: 'Como você quer ser chamado',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               TextFormField(
                 controller: _phoneController,
@@ -374,13 +419,26 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   labelText: 'Telefone',
                   hintText: '(11) 99999-9999',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               TextFormField(
                 controller: _cpfController,
@@ -389,13 +447,26 @@ class _PerfilScreenState extends State<PerfilScreen> {
                   labelText: 'CPF',
                   hintText: '000.000.000-00',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               Row(
                 children: [
@@ -405,7 +476,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
                       decoration: InputDecoration(
                         labelText: 'Cidade',
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: AppColors.textSecondary.withOpacity(0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                         filled: true,
                         fillColor: AppColors.background,
@@ -419,7 +503,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
                       decoration: InputDecoration(
                         labelText: 'Estado',
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: AppColors.textSecondary.withOpacity(0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                         filled: true,
                         fillColor: AppColors.background,
@@ -441,7 +538,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Botão Salvar
+              // Botão Salvar – estilo dashboard
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -450,14 +547,15 @@ class _PerfilScreenState extends State<PerfilScreen> {
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.textLight,
                     padding: const EdgeInsets.symmetric(vertical: 16),
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                   child: _isSaving
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
+                          height: 22,
+                          width: 22,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
@@ -466,15 +564,15 @@ class _PerfilScreenState extends State<PerfilScreen> {
                           ),
                         )
                       : const Text(
-                          'SALVAR ALTERAÇÕES',
+                          'Salvar alterações',
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Botão Sair
               SizedBox(
@@ -485,15 +583,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
                     foregroundColor: AppColors.error,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
+                    side: BorderSide(color: AppColors.error.withOpacity(0.6)),
                   ),
-                  child: const Text('SAIR'),
+                  child: const Text('Sair'),
                 ),
               ),
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: TorcidaHubBottomNav(
+        currentIndex: 4,
+        onTap: (index) => TorcidaHubBottomNav.navigateTo(context, index, 4),
       ),
     );
   }

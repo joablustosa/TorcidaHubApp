@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service_supabase.dart';
 import '../services/supabase_service.dart';
 import '../constants/app_colors.dart';
+import '../widgets/torcida_hub_bottom_nav.dart';
 import 'perfil_screen.dart';
 import 'auth/login_screen.dart';
 import 'criar_torcida_screen.dart';
@@ -223,6 +224,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Exibe "Nome (Apelido)" ou fallback para email/Usuário.
+  String get _userDisplayName {
+    final p = _authService.currentProfile;
+    final name = (p?.fullName ?? '').trim().isNotEmpty ? p!.fullName!.trim() : null;
+    final nickname = (p?.nickname ?? '').trim().isNotEmpty ? p?.nickname!.trim() : null;
+    if (name != null && nickname != null) return '$name ($nickname)';
+    if (name != null) return name;
+    if (nickname != null) return '($nickname)';
+    return _authService.userEmail ?? 'Usuário';
+  }
+
+  /// Iniciais do nome para avatar (ex: "João Silva" -> "JS").
+  String get _userInitials {
+    final name = _authService.currentProfile?.fullName?.trim() ?? _authService.userEmail ?? '';
+    if (name.isEmpty) return '?';
+    final parts = name.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      final a = parts.first.isNotEmpty ? parts.first[0].toUpperCase() : '';
+      final b = parts[1].isNotEmpty ? parts[1][0].toUpperCase() : '';
+      return '$a$b';
+    }
+    return name.length >= 2 ? name.substring(0, 2).toUpperCase() : name[0].toUpperCase();
+  }
+
+  Widget _buildUserAvatar() {
+    final avatarUrl = _authService.currentProfile?.avatarUrl?.trim();
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 24,
+        backgroundColor: AppColors.textLight.withOpacity(0.2),
+        backgroundImage: NetworkImage(avatarUrl),
+        onBackgroundImageError: (_, __) {},
+      );
+    }
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: AppColors.textLight.withOpacity(0.25),
+      child: Text(
+        _userInitials,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textLight,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -257,47 +306,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // Header
+          // Header moderno com gradiente e avatar
           Container(
-            color: AppColors.background,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary,
+                  AppColors.primary.withOpacity(0.92),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 8,
+              bottom: 14,
+              left: 20,
+              right: 12,
+            ),
             child: Row(
               children: [
-                Image.asset(
-                  'assets/logo.png',
-                  height: 40,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.sports_soccer, color: AppColors.textLight);
-                  },
-                ),
-                const Spacer(),
-                Text(
-                  _authService.userEmail ?? '',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                // Avatar (foto ou iniciais)
+                _buildUserAvatar(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Olá,',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textLight.withOpacity(0.85),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _userDisplayName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textLight,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ],
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PerfilScreen()),
-                    );
-                  },
-                  icon: const Icon(Icons.person_outline, size: 16),
-                  label: const Text('Perfil', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                  ),
-                ),
-                TextButton.icon(
+                IconButton(
                   onPressed: _handleSignOut,
-                  icon: const Icon(Icons.logout, size: 16),
-                  label: const Text('Sair', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
+                  icon: const Icon(Icons.logout_rounded, size: 22),
+                  color: AppColors.textLight,
+                  tooltip: 'Sair',
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.textLight.withOpacity(0.15),
                   ),
                 ),
               ],
@@ -310,11 +381,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: AppColors.primary,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Minhas Torcidas e Times - No início da página
+                    // Hero / mensagem em card discreto
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.primary.withOpacity(0.12),
+                            AppColors.lightGreen.withOpacity(0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            hasMemberships ? Icons.touch_app_rounded : Icons.add_circle_outline_rounded,
+                            color: AppColors.primary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              hasMemberships
+                                  ? 'Selecione uma torcida ou time para acessar.'
+                                  : 'Comece criando ou entrando em uma torcida.',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Minhas Torcidas e Times
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final isWide = constraints.maxWidth > 600;
@@ -339,120 +454,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Título de boas-vindas (após as torcidas)
-                    Text(
-                      'BEM-VINDO!',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      hasMemberships
-                          ? 'Selecione uma torcida ou time para acessar.'
-                          : 'Comece criando ou entrando em uma torcida.',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
                     // Solicitações Pendentes
                     if (hasPendingRequests) ...[
                       Row(
                         children: [
-                          Icon(Icons.access_time, color: AppColors.warning, size: 20),
-                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.schedule_rounded, color: AppColors.warning, size: 22),
+                          ),
+                          const SizedBox(width: 12),
                           Text(
                             'Solicitações Pendentes',
                             style: TextStyle(
                               fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${_pendingRequests.length}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.warning,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 18),
                       ..._pendingRequests.asMap().entries.map((entry) {
                         return _buildPendingRequestCard(entry.value, entry.key);
                       }),
                       const SizedBox(height: 24),
                     ],
-
-                    // Ações Rápidas
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.1,
-                      children: [
-                        _buildQuickActionCard(
-                          icon: Icons.add_circle_outline,
-                          title: 'CRIAR TORCIDA',
-                          subtitle: 'Cadastre sua torcida organizada',
-                          color: AppColors.primary,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const CriarTorcidaScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _buildQuickActionCard(
-                          icon: Icons.sports_soccer,
-                          title: 'CRIAR TIME',
-                          subtitle: 'Crie seu time amador',
-                          color: AppColors.lightGreen,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const CriarTimeScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _buildQuickActionCard(
-                          icon: Icons.search,
-                          title: 'BUSCAR',
-                          subtitle: 'Encontre torcidas e times',
-                          color: AppColors.hubBlue,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const BuscarTorcidasScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _buildQuickActionCard(
-                          icon: Icons.group_add,
-                          title: 'CONVITE',
-                          subtitle: 'Use código de convite',
-                          color: AppColors.textSecondary,
-                          isDashed: true,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const EntrarTorcidaScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
             ),
           ),
         ],
+      ),
+      bottomNavigationBar: TorcidaHubBottomNav(
+        currentIndex: 0,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CriarTimeScreen()),
+              );
+              break;
+            case 1:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const BuscarTorcidasScreen()),
+              );
+              break;
+            case 2:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CriarTorcidaScreen()),
+              );
+              break;
+            case 3:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const EntrarTorcidaScreen()),
+              );
+              break;
+            case 4:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PerfilScreen()),
+              );
+              break;
+          }
+        },
       ),
     );
   }
@@ -482,10 +566,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Card(
-      margin: EdgeInsets.only(bottom: index < totalCount - 1 ? 12 : 0),
-      elevation: 2,
+      margin: EdgeInsets.only(bottom: index < totalCount - 1 ? 14 : 0),
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: AppColors.textSecondary.withOpacity(0.12),
+          width: 1,
+        ),
       ),
       child: InkWell(
         onTap: () {
@@ -493,9 +581,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             '/minha-torcida/$fanClubId',
           );
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
               if (logoUrl != null && logoUrl.isNotEmpty)
@@ -630,15 +718,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final logoUrl = fanClub?['logo_url'] as String?;
 
     return Card(
-      margin: EdgeInsets.only(bottom: index < _pendingRequests.length - 1 ? 12 : 0),
-      elevation: 2,
-      color: AppColors.warning.withOpacity(0.05),
+      margin: EdgeInsets.only(bottom: index < _pendingRequests.length - 1 ? 14 : 0),
+      elevation: 0,
+      color: AppColors.warning.withOpacity(0.06),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.warning.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.warning.withOpacity(0.35)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Row(
           children: [
             if (logoUrl != null)
@@ -743,95 +831,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildQuickActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-    bool isDashed = false,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isDashed
-            ? BorderSide(
-                color: AppColors.textSecondary.withOpacity(0.2),
-                style: BorderStyle.solid,
-              )
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isDashed
-                      ? AppColors.textSecondary.withOpacity(0.1)
-                      : color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  color: isDashed ? AppColors.textSecondary : color,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDashed ? AppColors.textSecondary : AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildFanClubsSection(bool hasFanClubs, List<Map<String, dynamic>> memberships) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.shield, color: AppColors.primary, size: 20),
-            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.shield_rounded, color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 12),
             Text(
               'Minhas Torcidas',
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
+            if (memberships.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${memberships.length}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         if (hasFanClubs)
           ...memberships.asMap().entries.map((entry) {
             return _buildMembershipCard(
@@ -842,33 +885,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           })
         else
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: AppColors.textSecondary.withOpacity(0.2),
-                style: BorderStyle.solid,
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.textSecondary.withOpacity(0.15),
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.shield,
-                    size: 32,
-                    color: AppColors.textSecondary.withOpacity(0.5),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.shield_rounded,
+                  size: 40,
+                  color: AppColors.textSecondary.withOpacity(0.4),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Nenhuma torcida ainda',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Nenhuma torcida ainda',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
       ],
@@ -881,19 +922,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         Row(
           children: [
-            Icon(Icons.sports_soccer, color: AppColors.lightGreen, size: 20),
-            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.lightGreen.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.sports_soccer_rounded, color: AppColors.lightGreen, size: 22),
+            ),
+            const SizedBox(width: 12),
             Text(
               'Meus Times',
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
+            if (memberships.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.lightGreen.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${memberships.length}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.lightGreen,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         if (hasTeams)
           ...memberships.asMap().entries.map((entry) {
             return _buildMembershipCard(
@@ -904,33 +970,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           })
         else
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: AppColors.textSecondary.withOpacity(0.2),
-                style: BorderStyle.solid,
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.textSecondary.withOpacity(0.15),
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.sports_soccer,
-                    size: 32,
-                    color: AppColors.textSecondary.withOpacity(0.5),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.sports_soccer_rounded,
+                  size: 40,
+                  color: AppColors.textSecondary.withOpacity(0.4),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Nenhum time ainda',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Nenhum time ainda',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
       ],

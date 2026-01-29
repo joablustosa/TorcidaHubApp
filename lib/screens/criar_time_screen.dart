@@ -3,6 +3,7 @@ import '../services/auth_service_supabase.dart';
 import '../services/supabase_service.dart';
 import '../models/supabase_models.dart';
 import '../constants/app_colors.dart';
+import '../widgets/torcida_hub_bottom_nav.dart';
 import 'minha_torcida_screen.dart';
 
 class CriarTimeScreen extends StatefulWidget {
@@ -73,6 +74,7 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
         const SnackBar(
           content: Text('Você precisa estar logado para criar um time'),
           backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -83,6 +85,7 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
         const SnackBar(
           content: Text('Selecione o tipo do time'),
           backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -142,6 +145,7 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
           const SnackBar(
             content: Text('Time criado com sucesso!'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
 
@@ -157,6 +161,7 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
           SnackBar(
             content: Text('Erro ao criar time: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -185,43 +190,60 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text('Criar Novo Time'),
-        backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textLight,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.primary],
+            ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Logo placeholder
+              // Logo placeholder – estilo dashboard
               Container(
                 height: 120,
                 decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.textSecondary.withOpacity(0.3),
+                    color: AppColors.textSecondary.withOpacity(0.15),
                   ),
                 ),
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.add_photo_alternate,
-                        size: 40,
-                        color: AppColors.textSecondary,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightGreen.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.add_photo_alternate_rounded,
+                          size: 36,
+                          color: AppColors.lightGreen,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         'Escudo do Time',
                         style: TextStyle(
+                          fontSize: 14,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -229,7 +251,7 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
               // Nome do Time
               TextFormField(
@@ -238,7 +260,20 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                   labelText: 'Nome do Time *',
                   hintText: 'Ex: Pelada do Sábado FC',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
@@ -258,7 +293,20 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                 decoration: InputDecoration(
                   labelText: 'Tipo de Time *',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
@@ -293,7 +341,20 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                         labelText: 'Cidade *',
                         hintText: 'São Paulo',
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: AppColors.textSecondary.withOpacity(0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                         filled: true,
                         fillColor: AppColors.background,
@@ -313,7 +374,20 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                       decoration: InputDecoration(
                         labelText: 'Estado *',
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: AppColors.textSecondary.withOpacity(0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                         filled: true,
                         fillColor: AppColors.background,
@@ -348,13 +422,26 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                   labelText: 'Bairro / Região',
                   hintText: 'Ex: Vila Madalena',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               // Ano de Fundação
               TextFormField(
@@ -364,13 +451,26 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                   labelText: 'Ano de Fundação',
                   hintText: DateTime.now().year.toString(),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               // Descrição
               TextFormField(
@@ -380,7 +480,20 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                   labelText: 'Descrição',
                   hintText: 'Conte um pouco sobre o time, onde jogam, dias de jogo...',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: AppColors.textSecondary.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                   filled: true,
                   fillColor: AppColors.background,
@@ -388,8 +501,15 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Público/Privado
-              Card(
+              // Público/Privado – card estilo dashboard
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.textSecondary.withOpacity(0.12),
+                  ),
+                ),
                 child: SwitchListTile(
                   title: const Text('Time Público'),
                   subtitle: Text(
@@ -406,7 +526,7 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                   activeColor: AppColors.primary,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
               // Botão Criar
               ElevatedButton(
@@ -415,14 +535,15 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                   backgroundColor: AppColors.lightGreen,
                   foregroundColor: AppColors.textLight,
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                        height: 20,
-                        width: 20,
+                        height: 22,
+                        width: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -433,13 +554,13 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.sports_soccer),
-                          const SizedBox(width: 8),
+                          const Icon(Icons.sports_soccer_rounded, size: 22),
+                          const SizedBox(width: 10),
                           const Text(
-                            'CRIAR TIME',
+                            'Criar time',
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -448,6 +569,10 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: TorcidaHubBottomNav(
+        currentIndex: 0,
+        onTap: (index) => TorcidaHubBottomNav.navigateTo(context, index, 0),
       ),
     );
   }

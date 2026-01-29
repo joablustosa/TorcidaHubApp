@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/minha_torcida_screen.dart';
 import 'services/auth_service_supabase.dart';
 import 'services/supabase_service.dart';
@@ -80,12 +81,15 @@ class _TorcidaHubAppState extends State<TorcidaHubApp> {
   }
 
   Future<void> _checkAuthState() async {
-    // Verificar sessão inicial
+    // Garantir que a splash seja exibida pelo menos 2 segundos
+    await Future.delayed(const Duration(seconds: 2));
     final session = SupabaseService.auth.currentSession;
-    setState(() {
-      _isAuthenticated = session != null;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isAuthenticated = session != null;
+        _isLoading = false;
+      });
+    }
   }
 
   void _setupAuthListener() {
@@ -123,25 +127,15 @@ class _TorcidaHubAppState extends State<TorcidaHubApp> {
     if (_isLoading) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: AppColors.heroGradient,
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.textLight,
-              ),
-            ),
-          ),
-        ),
+        title: 'TorcidaHub',
+        home: const SplashScreen(),
       );
     }
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'Torcida Hub',
+      title: 'TorcidaHub',
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

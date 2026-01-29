@@ -6,6 +6,7 @@ class PostService {
     required String fanClubId,
     int limit = 10,
     int offset = 0,
+    String? currentUserId,
   }) async {
     try {
       final response = await SupabaseService.client
@@ -45,8 +46,11 @@ class PostService {
               .from('post_likes')
               .select('user_id')
               .eq('post_id', postData['id'].toString());
-          
-          postData['likes_count'] = ((likesResponse as List? ?? []) as List).length;
+
+          final likesList = (likesResponse as List? ?? []) as List;
+          postData['likes_count'] = likesList.length;
+          postData['user_liked'] = currentUserId != null &&
+              likesList.any((e) => (e as Map)['user_id'] == currentUserId);
         } catch (e) {
           print('Erro ao buscar likes: $e');
         }

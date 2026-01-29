@@ -77,6 +77,11 @@ class _CommentSectionState extends State<CommentSection> {
   bool _isSubmitting = false;
   String? _replyingToId;
   String? _replyingToName;
+  String? _loadError;
+  /// Quantos comentários (pais) exibir inicialmente; aumentar ao tocar em "Ver mais".
+  static const int _initialVisibleCount = 3;
+  static const int _loadMoreCount = 5;
+  int _visibleCount = _initialVisibleCount;
 
   @override
   void initState() {
@@ -87,102 +92,143 @@ class _CommentSectionState extends State<CommentSection> {
   Future<void> _loadComments() async {
     setState(() {
       _isLoading = true;
+      _loadError = null;
     });
 
     try {
+      // 1. Buscar comentários sem join (evita erro de relação no Supabase)
       final response = await SupabaseService.client
           .from('post_comments')
-          .select('''
-            *,
-            profiles!inner (
-              id,
-              full_name,
-              nickname,
-              avatar_url,
-              updated_at
-            )
-          ''')
+          .select('id, post_id, user_id, content, parent_id, created_at')
           .eq('post_id', widget.postId)
           .order('created_at', ascending: true);
 
-      if (response != null) {
-        final List<dynamic> data = response as List;
-        
-        // Buscar likes
-        final commentIds = data.map((c) => (c as Map)['id'] as String).toList();
-        final likesResponse = await SupabaseService.client
-            .from('comment_likes')
-            .select('comment_id, user_id')
-            .inFilter('comment_id', commentIds);
+      if (response == null) {
+        setState(() => _comments = []);
+        return;
+      }
 
-        final likesMap = <String, List<String>>{};
-        final userLikesSet = <String>{};
+      final List<dynamic> data = response as List;
+      if (data.isEmpty) {
+        setState(() => _comments = []);
+        return;
+      }
 
-        if (likesResponse != null) {
-          for (var like in likesResponse as List) {
-            final likeData = like as Map<String, dynamic>;
-            final commentId = likeData['comment_id'] as String;
-            final userId = likeData['user_id'] as String;
+      // 2. Buscar perfis dos autores (user_ids únicos)
+      final userIds = <String>{};
+      for (var item in data) {
+        final map = item as Map<String, dynamic>;
+        final uid = map['user_id']?.toString();
+        if (uid != null && uid.isNotEmpty) userIds.add(uid);
+      }
 
-            likesMap.putIfAbsent(commentId, () => []).add(userId);
-            if (userId == _authService.userId) {
-              userLikesSet.add(commentId);
+      final profilesMap = <String, Profile>{};
+      if (userIds.isNotEmpty) {
+        try {
+          final profilesResponse = await SupabaseService.client
+              .from('profiles')
+              .select('id, full_name, nickname, avatar_url, updated_at')
+              .inFilter('id', userIds.toList());
+          if (profilesResponse != null) {
+            for (var p in profilesResponse as List) {
+              final profileMap = Map<String, dynamic>.from(p as Map);
+              try {
+                final profile = Profile.fromJson(profileMap);
+                profilesMap[profile.id] = profile;
+              } catch (_) {}
             }
           }
-        }
+        } catch (_) {}
+      }
 
-        // Organizar em threads
-        final parentComments = <Comment>[];
-        final repliesMap = <String, List<Comment>>{};
+      // 3. Buscar likes dos comentários (opcional; se falhar, segue sem)
+      final likesMap = <String, List<String>>{};
+      final userLikesSet = <String>{};
+      final commentIds = data.map((c) => (c as Map)['id'].toString()).toList();
+      if (commentIds.isNotEmpty) {
+        try {
+          final likesResponse = await SupabaseService.client
+              .from('comment_likes')
+              .select('comment_id, user_id')
+              .inFilter('comment_id', commentIds);
+          if (likesResponse != null) {
+            for (var like in likesResponse as List) {
+              final likeData = like as Map<String, dynamic>;
+              final commentId = likeData['comment_id']?.toString() ?? '';
+              final userId = likeData['user_id']?.toString() ?? '';
+              if (commentId.isNotEmpty) {
+                likesMap.putIfAbsent(commentId, () => []).add(userId);
+                if (userId == _authService.userId) userLikesSet.add(commentId);
+              }
+            }
+          }
+        } catch (_) {}
+      }
 
-        for (var item in data) {
-          final commentData = Map<String, dynamic>.from(item);
-          final parentId = commentData['parent_id'] as String?;
-          
-          final comment = Comment(
-            id: commentData['id'] as String,
-            postId: commentData['post_id'] as String,
-            userId: commentData['user_id'] as String,
-            content: commentData['content'] as String,
-            parentId: parentId,
-            createdAt: DateTime.parse(commentData['created_at'] as String),
-            author: commentData['profiles'] != null
-                ? Profile.fromJson(Map<String, dynamic>.from(commentData['profiles']))
-                : null,
-            likesCount: likesMap[commentData['id']]?.length ?? 0,
-            userLiked: userLikesSet.contains(commentData['id']),
-          );
+      // 4. Montar comentários e threads
+      final parentComments = <Comment>[];
+      final repliesMap = <String, List<Comment>>{};
 
-          if (parentId == null) {
-            parentComments.add(comment);
-          } else {
-            repliesMap.putIfAbsent(parentId, () => []).add(comment);
+      for (var item in data) {
+        final commentData = Map<String, dynamic>.from(item as Map);
+        final id = commentData['id']?.toString() ?? '';
+        final userId = commentData['user_id']?.toString() ?? '';
+        final parentId = commentData['parent_id']?.toString();
+        final createdAtRaw = commentData['created_at'];
+        DateTime createdAt = DateTime.now();
+        if (createdAtRaw != null) {
+          if (createdAtRaw is String) {
+            createdAt = DateTime.tryParse(createdAtRaw) ?? createdAt;
+          } else if (createdAtRaw is DateTime) {
+            createdAt = createdAtRaw;
           }
         }
 
-        // Adicionar replies aos parents
-        for (var parent in parentComments) {
-          final replies = repliesMap[parent.id] ?? [];
-          parent = Comment(
-            id: parent.id,
-            postId: parent.postId,
-            userId: parent.userId,
-            content: parent.content,
-            parentId: parent.parentId,
-            createdAt: parent.createdAt,
-            author: parent.author,
-            replies: replies,
-            likesCount: parent.likesCount,
-            userLiked: parent.userLiked,
-          );
+        final comment = Comment(
+          id: id,
+          postId: commentData['post_id']?.toString() ?? '',
+          userId: userId,
+          content: commentData['content']?.toString() ?? '',
+          parentId: parentId != null && parentId.isNotEmpty ? parentId : null,
+          createdAt: createdAt,
+          author: profilesMap[userId],
+          likesCount: likesMap[id]?.length ?? 0,
+          userLiked: userLikesSet.contains(id),
+        );
+
+        if (comment.parentId == null || comment.parentId!.isEmpty) {
+          parentComments.add(comment);
+        } else {
+          repliesMap.putIfAbsent(comment.parentId!, () => []).add(comment);
         }
+      }
+
+      // 5. Atribuir replies aos pais
+      final parentCommentsWithReplies = parentComments.map((parent) {
+        final replies = repliesMap[parent.id] ?? [];
+        return Comment(
+          id: parent.id,
+          postId: parent.postId,
+          userId: parent.userId,
+          content: parent.content,
+          parentId: parent.parentId,
+          createdAt: parent.createdAt,
+          author: parent.author,
+          replies: replies,
+          likesCount: parent.likesCount,
+          userLiked: parent.userLiked,
+        );
+      }).toList();
 
         setState(() {
-          _comments = parentComments;
+          _comments = parentCommentsWithReplies;
+          _visibleCount = _initialVisibleCount;
         });
-      }
     } catch (e) {
       print('Erro ao carregar comentários: $e');
+      setState(() {
+        _loadError = e.toString();
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -221,6 +267,7 @@ class _CommentSectionState extends State<CommentSection> {
           const SnackBar(
             content: Text('Comentário adicionado!'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -230,6 +277,7 @@ class _CommentSectionState extends State<CommentSection> {
           SnackBar(
             content: Text('Erro ao comentar: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -276,6 +324,7 @@ class _CommentSectionState extends State<CommentSection> {
           const SnackBar(
             content: Text('Comentário removido'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -285,6 +334,7 @@ class _CommentSectionState extends State<CommentSection> {
           SnackBar(
             content: Text('Erro ao remover: ${e.toString()}'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -318,16 +368,22 @@ class _CommentSectionState extends State<CommentSection> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleComments = _comments.length > _visibleCount
+        ? _comments.sublist(0, _visibleCount)
+        : _comments;
+    final hasMore = _comments.length > _visibleCount;
+    final remainingCount = _comments.length - _visibleCount;
+
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: AppColors.textSecondary.withOpacity(0.2)),
-        ),
-      ),
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
+          // Linha sutil que integra ao card (estilo Instagram)
+          Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.12)),
+          const SizedBox(height: 8),
           // Lista de comentários
           if (_isLoading)
             const Center(
@@ -338,26 +394,89 @@ class _CommentSectionState extends State<CommentSection> {
                 ),
               ),
             )
-          else if (_comments.isEmpty)
+          else if (_loadError != null)
             Padding(
               padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Erro ao carregar comentários.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _loadError!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: _loadComments,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Tentar novamente'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (_comments.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Text(
                 'Nenhum comentário ainda.',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
               ),
             )
-          else
+          else ...[
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _comments.length,
+              itemCount: visibleComments.length,
               itemBuilder: (context, index) {
-                return _buildCommentItem(_comments[index], false);
+                return _buildCommentItem(visibleComments[index], false);
               },
             ),
+            if (hasMore)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 4),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _visibleCount = (_visibleCount + _loadMoreCount)
+                          .clamp(0, _comments.length);
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                    child: Text(
+                      remainingCount > 0
+                          ? 'Ver mais comentários ($remainingCount)'
+                          : 'Ver mais comentários',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
 
           // Indicador de resposta
           if (_replyingToName != null)

@@ -1,33 +1,52 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Cores principais
-  static const Color primary = Colors.green;
-  static const Color primaryAccent = Colors.greenAccent;
+  // Cores principais baseadas no logo Torcida Hub
+  // Verde escuro (dark green) - borda externa e fundo do escudo
+  static const Color darkGreen = Color(0xFF1B5E20);
+  static const Color primary = Color(0xFF2E7D32); // Verde médio
+  static const Color lightGreen = Color(0xFF66BB6A); // Verde claro
+  static const Color neonGreen = Color(0xFF4CAF50); // Verde neon dos holofotes
+  
+  // Azul do texto "HUB"
+  static const Color hubBlue = Color(0xFF2196F3);
+  static const Color blueAccent = Color(0xFF42A5F5);
+  
+  // Vermelho da seta
+  static const Color accentRed = Color(0xFFE53935);
+  
+  // Cores neutras
   static const Color white = Colors.white;
+  static const Color black = Colors.black;
   static const Color grey = Colors.grey;
   
   // Gradientes
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Colors.green, Colors.greenAccent],
+    colors: [darkGreen, primary, lightGreen],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [darkGreen, primary],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+  
   // Cores de estado
-  static const Color success = Colors.green;
-  static const Color error = Colors.red;
-  static const Color warning = Colors.orange;
-  static const Color info = Colors.blue;
+  static const Color success = lightGreen;
+  static const Color error = accentRed;
+  static const Color warning = Color(0xFFFF9800);
+  static const Color info = hubBlue;
   
   // Cores de texto
-  static const Color textPrimary = Colors.black87;
-  static const Color textSecondary = Colors.black54;
+  static const Color textPrimary = Color(0xFF212121);
+  static const Color textSecondary = Color(0xFF757575);
   static const Color textLight = Colors.white;
-  static const Color textLightSecondary = Colors.white70;
+  static const Color textLightSecondary = Color(0xFFE0E0E0);
   
   // Cores de fundo
-  static const Color background = Colors.white;
+  static const Color background = Color(0xFFFAFAFA);
   static const Color surface = Colors.white;
   static const Color cardBackground = Colors.white;
   

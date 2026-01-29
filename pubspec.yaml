@@ -1,5 +1,5 @@
-name: agendadefesta
-description: Aplicativo profissional para gerenciar agenda de evento doméstica, clientes e pagamentos
+name: torcida_hub
+description: Torcida Hub - Plataforma para gerenciar torcidas organizadas e times amadores
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -17,6 +17,11 @@ dependencies:
   http: ^1.1.0
   shared_preferences: ^2.2.2
   url_launcher: ^6.2.5
+  supabase_flutter: ^2.0.0
+  cached_network_image: ^3.3.0
+  image_picker: ^1.0.4
+  flutter_svg: ^2.0.9
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
@@ -28,4 +33,6 @@ flutter:
   
   assets:
     - assets/icon.png
-    - assets/logoDmais.png
+    - assets/logo.png
+    - assets/favicon.png
+    - assets/placeholder.svg

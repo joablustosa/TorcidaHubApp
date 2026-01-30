@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/auth_service_supabase.dart';
 import '../services/supabase_service.dart';
+import '../services/event_service.dart';
+import '../models/supabase_models.dart';
 import '../constants/app_colors.dart';
 import '../widgets/torcida_hub_bottom_nav.dart';
 import 'perfil_screen.dart';
@@ -22,6 +25,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _memberships = [];
   List<Map<String, dynamic>> _pendingRequests = [];
+  List<Event> _upcomingEvents = [];
 
   @override
   void initState() {
@@ -48,6 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _fetchMemberships(),
         _fetchPendingRequests(),
       ]);
+      await _fetchUpcomingEvents();
     } catch (e) {
       print('Erro ao carregar dados: $e');
     } finally {
@@ -181,6 +186,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _fetchUpcomingEvents() async {
+    if (_memberships.isEmpty || _authService.userId == null) {
+      if (mounted) setState(() => _upcomingEvents = []);
+      return;
+    }
+    try {
+      final now = DateTime.now();
+      final List<Event> all = [];
+      for (var m in _memberships) {
+        final fanClubId = m['fan_club_id'] as String?;
+        if (fanClubId == null) continue;
+        final list = await EventService.getEvents(
+          fanClubId: fanClubId,
+          userId: _authService.userId,
+        );
+        all.addAll(list.where((e) => e.eventDate.isAfter(now) || e.eventDate.isAtSameMomentAs(now)));
+      }
+      all.sort((a, b) => a.eventDate.compareTo(b.eventDate));
+      if (mounted) {
+        setState(() {
+          _upcomingEvents = all.take(20).toList();
+        });
+      }
+    } catch (e) {
+      print('Erro ao buscar eventos: $e');
+      if (mounted) setState(() => _upcomingEvents = []);
+    }
+  }
+
   bool _isAmateurTeam(String? clubType) {
     if (clubType == null) return false;
     return ['amateur_team', 'neighborhood_team', 'school_team', 'work_team']
@@ -209,6 +243,137 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _getFanClubId(Map<String, dynamic> membership) {
     return membership['fan_club_id'] as String;
+  }
+
+  String? _getFanClubLogoUrl(String fanClubId) {
+    try {
+      final m = _memberships.firstWhere(
+        (m) => (m['fan_club_id'] as String?) == fanClubId,
+      );
+      final fanClub = m['fan_clubs'] as Map<String, dynamic>?;
+      return fanClub?['logo_url'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildEventCirclePlaceholder() {
+    return Container(
+      color: AppColors.primary.withOpacity(0.12),
+      child: Icon(
+        Icons.event_rounded,
+        color: AppColors.primary,
+        size: 32,
+      ),
+    );
+  }
+
+  Widget _buildEventCircleImage(Event event) {
+    final imageUrl = event.imageUrl != null && event.imageUrl!.trim().isNotEmpty
+        ? event.imageUrl
+        : _getFanClubLogoUrl(event.fanClubId);
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      return _buildEventCirclePlaceholder();
+    }
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.cover,
+      width: 72,
+      height: 72,
+      placeholder: (_, __) => _buildEventCirclePlaceholder(),
+      errorWidget: (_, __, ___) => _buildEventCirclePlaceholder(),
+    );
+  }
+
+  Widget _buildEventsHorizontalList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Próximos eventos',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 112,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            itemCount: _upcomingEvents.length,
+            itemBuilder: (context, index) {
+              final event = _upcomingEvents[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: SizedBox(
+                  height: 112,
+                  width: 80,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(context).pushNamed(
+                        '/minha-torcida/${event.fanClubId}',
+                        arguments: {'tabIndex': 1},
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.5),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: _buildEventCircleImage(event),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: ClipRect(
+                            child: SizedBox(
+                              width: 80,
+                              child: Text(
+                                event.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   String _getPosition(Map<String, dynamic> membership) {
@@ -428,6 +593,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
+
+                    // Próximos eventos (lista horizontal estilo status)
+                    if (_upcomingEvents.isNotEmpty) ...[
+                      _buildEventsHorizontalList(),
+                      const SizedBox(height: 24),
+                    ],
 
                     // Minhas Torcidas e Times
                     LayoutBuilder(

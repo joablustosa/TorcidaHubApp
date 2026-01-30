@@ -189,11 +189,8 @@ class _CriarTimeScreenState extends State<CriarTimeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Criar Novo Time'),
+        centerTitle: true,
+        title: const Text('Criar Novo Time', style: TextStyle(fontSize: 18),),
         foregroundColor: AppColors.textLight,
         elevation: 0,
         flexibleSpace: Container(

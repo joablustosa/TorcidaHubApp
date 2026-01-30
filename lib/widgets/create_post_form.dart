@@ -103,7 +103,8 @@ class _CreatePostFormState extends State<CreatePostForm> {
         content: _contentController.text.trim().isEmpty
             ? null
             : _contentController.text.trim(),
-        imageUrls: imageUrl != null ? [imageUrl] : null,
+        imageUrl: imageUrl,
+        allowComments: _allowComments,
       );
 
       // Limpar formulário

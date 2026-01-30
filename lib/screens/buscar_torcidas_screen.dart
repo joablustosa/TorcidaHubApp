@@ -469,11 +469,8 @@ class _BuscarTorcidasScreenState extends State<BuscarTorcidasScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Buscar Torcidas e Times'),
+        centerTitle: true,
+        title: const Text('Buscar Torcidas e Times', style: TextStyle(fontSize: 18),),
         foregroundColor: AppColors.textLight,
         elevation: 0,
         flexibleSpace: Container(

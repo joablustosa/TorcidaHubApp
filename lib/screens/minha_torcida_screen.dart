@@ -49,6 +49,12 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
   final Set<String> _registeredEventIds = {};
   /// IDs de eventos em que o usuário cancelou a inscrição nesta sessão.
   final Set<String> _cancelledEventIds = {};
+  /// Lista de membros da torcida (aba Membros).
+  List<FanClubMember> _members = [];
+  /// Perfis dos membros (user_id -> Profile).
+  Map<String, Profile> _memberProfiles = {};
+  /// Cargos da torcida (id, name) para alterar função do membro.
+  List<Map<String, dynamic>> _fanClubPositions = [];
 
   @override
   void initState() {
@@ -59,6 +65,17 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
       currentUserId: _authService.userId,
     );
     _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map<String, dynamic> &&
+          args['tabIndex'] != null &&
+          mounted) {
+        final tab = args['tabIndex'] as int;
+        if (tab >= 0 && tab <= 4) {
+          setState(() => _currentTabIndex = tab);
+        }
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -71,6 +88,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
       await _fetchMember();
       await _fetchProfile();
       await _fetchMemberCount();
+      await _fetchMembers();
+      await _fetchFanClubPositions();
       await _fetchPermissions();
     } catch (e) {
       print('Erro ao carregar dados: $e');
@@ -170,6 +189,85 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
     }
   }
 
+  /// Busca membros da torcida (select *, order position.asc, joined_at.asc, status=active).
+  Future<void> _fetchMembers() async {
+    try {
+      final response = await SupabaseService.client
+          .from('fan_club_members')
+          .select()
+          .eq('fan_club_id', widget.fanClubId)
+          .eq('status', 'active')
+          .order('position', ascending: true)
+          .order('joined_at', ascending: true);
+
+      final List<dynamic> data = (response as List? ?? []);
+      final List<FanClubMember> list = data
+          .map((e) => FanClubMember.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+
+      final userIds = list.map((m) => m.userId).toSet().toList();
+      final Map<String, Profile> profiles = {};
+      if (userIds.isNotEmpty) {
+        final profilesResponse = await SupabaseService.client
+            .from('profiles')
+            .select()
+            .inFilter('id', userIds);
+        final profilesList = (profilesResponse as List? ?? []);
+        for (var p in profilesList) {
+          final profile = Profile.fromJson(Map<String, dynamic>.from(p));
+          profiles[profile.id] = profile;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _members = list;
+          _memberProfiles = profiles;
+        });
+      }
+    } catch (e) {
+      print('Erro ao buscar membros: $e');
+      if (mounted) {
+        setState(() {
+          _members = [];
+          _memberProfiles = {};
+        });
+      }
+    }
+  }
+
+  /// Busca cargos da torcida (fan_club_positions) para o dropdown de função.
+  Future<void> _fetchFanClubPositions() async {
+    try {
+      final response = await SupabaseService.client
+          .from('fan_club_positions')
+          .select('id, name')
+          .eq('fan_club_id', widget.fanClubId);
+
+      final List<dynamic> data = (response as List? ?? []);
+      if (mounted) {
+        setState(() {
+          _fanClubPositions = data
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        });
+      }
+    } catch (e) {
+      print('Erro ao buscar cargos: $e');
+      if (mounted) {
+        setState(() => _fanClubPositions = []);
+      }
+    }
+  }
+
+  /// Presidente ou vice-presidente (ou quem tem gerenciar_membros) pode alterar função.
+  bool get _canChangeMemberRole {
+    if (_member == null) return false;
+    final p = _member!.position;
+    if (p == 'presidente' || p == 'vice_presidente') return true;
+    return _hasPermission('gerenciar_membros');
+  }
+
   Future<void> _fetchPermissions() async {
     if (_member == null) {
       setState(() {
@@ -247,7 +345,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: const Text('Torcida não encontrada'),
+          centerTitle: true,
+          title: const Text('Torcida não encontrada', style: TextStyle(fontSize: 18),),
           foregroundColor: AppColors.textLight,
           elevation: 0,
           flexibleSpace: Container(
@@ -310,6 +409,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        centerTitle: true,
         title: Text(
           _fanClub!.name,
           style: const TextStyle(
@@ -337,7 +437,6 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           _buildMembrosTab(),
           _buildAlbunsTab(),
           _buildGamificacaoTab(),
-          _buildConfigTab(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -380,10 +479,6 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                 BottomNavigationBarItem(
                   icon: Icon(Icons.emoji_events_rounded),
                   label: 'Ranking',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.settings_rounded),
-                  label: 'Config',
                 ),
               ],
             ),
@@ -1181,18 +1276,599 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Text(
-                'Lista de membros em breve...',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary),
+          if (_members.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Text(
+                  'Nenhum membro encontrado.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _members.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final member = _members[index];
+                final profile = _memberProfiles[member.userId];
+                return _buildMemberTile(member, profile);
+              },
             ),
-          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMemberTile(FanClubMember member, Profile? profile) {
+    final displayName = profile?.fullName ?? 'Membro';
+    final nickname = profile?.nickname;
+    final avatarUrl = profile?.avatarUrl;
+    final positionLabel = _getPositionLabel(member.position);
+    final badgeLabel = _getBadgeLabel(member.badgeLevel);
+    final badgeColor = _getBadgeColor(member.badgeLevel);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showMemberSheet(member, profile),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.textSecondary.withOpacity(0.12),
+            ),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: avatarUrl != null && avatarUrl.isNotEmpty
+                    ? Image.network(
+                        avatarUrl,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _avatarPlaceholder(displayName, 56),
+                      )
+                    : _avatarPlaceholder(displayName, 56),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (nickname != null && nickname.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '"$nickname"',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            positionLabel,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            badgeLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: badgeColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: AppColors.textSecondary,
+                size: 24,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarPlaceholder(String displayName, double size) {
+    return Container(
+      width: size,
+      height: size,
+      color: AppColors.primary.withOpacity(0.1),
+      child: Center(
+        child: Text(
+          displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+          style: TextStyle(
+            fontSize: size * 0.45,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getPositionLabel(String position) {
+    switch (position) {
+      case 'presidente':
+        return 'Presidente';
+      case 'vice_presidente':
+        return 'Vice-Presidente';
+      case 'diretoria':
+        return 'Diretoria';
+      case 'coordenador':
+        return 'Coordenador';
+      case 'membro':
+        return 'Membro';
+      default:
+        return position.isNotEmpty
+            ? position.replaceAll('_', '-').split(' ').map((s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).toLowerCase()).join(' ')
+            : position;
+    }
+  }
+
+  /// Opções de função para o dropdown (como na imagem: Diretoria, Vice-Presidente, Coordenador, Membro).
+  static const List<Map<String, String>> _roleOptions = [
+    {'label': 'Diretoria', 'slug': 'diretoria', 'icon': 'star'},
+    {'label': 'Vice-Presidente', 'slug': 'vice_presidente', 'icon': 'person'},
+    {'label': 'Coordenador', 'slug': 'coordenador', 'icon': 'shield'},
+    {'label': 'Membro', 'slug': 'membro', 'icon': 'person'},
+  ];
+
+  Color _getBadgeColor(String badgeLevel) {
+    switch (badgeLevel) {
+      case 'bronze':
+        return Colors.brown;
+      case 'prata':
+        return Colors.grey;
+      case 'ouro':
+        return Colors.amber;
+      case 'diamante':
+        return Colors.cyan;
+      default:
+        return AppColors.primary;
+    }
+  }
+
+  String _getBadgeLabel(String badgeLevel) {
+    switch (badgeLevel) {
+      case 'bronze':
+        return 'Bronze';
+      case 'prata':
+        return 'Prata';
+      case 'ouro':
+        return 'Ouro';
+      case 'diamante':
+        return 'Diamante';
+      default:
+        return badgeLevel;
+    }
+  }
+
+  String _formatJoinDate(DateTime d) {
+    final months = [
+      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+    ];
+    return '${months[d.month - 1]} ${d.year}';
+  }
+
+  void _showMemberSheet(FanClubMember member, Profile? profile) {
+    final displayName = profile?.fullName ?? 'Membro';
+    final nickname = profile?.nickname;
+    final avatarUrl = profile?.avatarUrl;
+    final positionLabel = _getPositionLabel(member.position);
+    final badgeLabel = _getBadgeLabel(member.badgeLevel);
+    final badgeColor = _getBadgeColor(member.badgeLevel);
+    final joinDate = member.joinedAt != null
+        ? _formatJoinDate(member.joinedAt!)
+        : null;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textSecondary.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: avatarUrl != null && avatarUrl.isNotEmpty
+                          ? Image.network(
+                              avatarUrl,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _avatarPlaceholder(displayName, 80),
+                            )
+                          : _avatarPlaceholder(displayName, 80),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (nickname != null && nickname.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '"$nickname"',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: AppColors.textSecondary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              positionLabel,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.textSecondary.withOpacity(0.1),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      _sheetRow(
+                        icon: Icons.badge_outlined,
+                        label: 'Nº da carteirinha',
+                        value: member.registrationNumber,
+                      ),
+                      const SizedBox(height: 16),
+                      _sheetRow(
+                        icon: Icons.star_outline,
+                        label: 'Nível',
+                        value: badgeLabel,
+                        valueColor: badgeColor,
+                      ),
+                      const SizedBox(height: 16),
+                      _sheetRow(
+                        icon: Icons.tag,
+                        label: 'Pontos',
+                        value: '${member.points} pts',
+                        valueColor: AppColors.primary,
+                      ),
+                      if (joinDate != null) ...[
+                        const SizedBox(height: 16),
+                        _sheetRow(
+                          icon: Icons.calendar_today_outlined,
+                          label: 'Membro desde',
+                          value: joinDate,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (_canChangeMemberRole) ...[
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Alterar função',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._roleOptions.map((opt) {
+                        final slug = opt['slug']!;
+                        final label = opt['label']!;
+                        final isSelected = member.position == slug;
+                        final iconData = opt['icon'] == 'star'
+                            ? Icons.star
+                            : opt['icon'] == 'shield'
+                                ? Icons.shield
+                                : Icons.person_outline;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _updateMemberPosition(
+                                context: context,
+                                member: member,
+                                newPosition: slug,
+                                newPositionLabel: label,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary.withOpacity(0.08)
+                                      : AppColors.background,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.textSecondary.withOpacity(0.15),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      iconData,
+                                      size: 22,
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        label,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                          color: isSelected
+                                              ? AppColors.primary
+                                              : AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 22,
+                                        color: AppColors.primary,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateMemberPosition({
+    required BuildContext context,
+    required FanClubMember member,
+    required String newPosition,
+    required String newPositionLabel,
+  }) async {
+    if (member.position == newPosition) return;
+
+    final positionId = _getPositionIdByName(newPositionLabel);
+
+    try {
+      final updates = <String, dynamic>{
+        'position': newPosition,
+      };
+      if (positionId != null) {
+        updates['position_id'] = positionId;
+      }
+
+      await SupabaseService.client
+          .from('fan_club_members')
+          .update(updates)
+          .eq('id', member.id);
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // fecha o sheet
+
+      setState(() {
+        final idx = _members.indexWhere((m) => m.id == member.id);
+        if (idx >= 0) {
+          _members[idx] = FanClubMember(
+            id: member.id,
+            fanClubId: member.fanClubId,
+            userId: member.userId,
+            position: newPosition,
+            status: member.status,
+            badgeLevel: member.badgeLevel,
+            registrationNumber: member.registrationNumber,
+            points: member.points,
+            joinedAt: member.joinedAt,
+            createdAt: member.createdAt,
+          );
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Função alterada para $newPositionLabel'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao alterar função: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Retorna position_id da tabela fan_club_positions pelo nome do cargo (ex: "Coordenador").
+  String? _getPositionIdByName(String positionLabel) {
+    final normalized = positionLabel.toLowerCase().replaceAll('-', ' ').replaceAll('_', ' ');
+    for (var p in _fanClubPositions) {
+      final name = (p['name'] as String? ?? '').toLowerCase().replaceAll('-', ' ').replaceAll('_', ' ');
+      if (name == normalized || name.contains(normalized) || normalized.contains(name)) {
+        return p['id'] as String?;
+      }
+    }
+    for (var p in _fanClubPositions) {
+      final name = p['name'] as String? ?? '';
+      if (name.toLowerCase().startsWith(normalized.split(' ').first)) {
+        return p['id'] as String?;
+      }
+    }
+    return null;
+  }
+
+  Widget _sheetRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.textSecondary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? AppColors.textPrimary,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 
@@ -1542,86 +2218,6 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
             limit: 20,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildConfigTab() {
-    if (!_isAdmin) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Text(
-            'Apenas administradores podem acessar as configurações.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ),
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-      children: [
-        _buildConfigTile(
-          icon: Icons.edit_rounded,
-          title: 'Editar Informações',
-          onTap: () {
-            // TODO: Implementar editar torcida
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildConfigTile(
-          icon: Icons.people_rounded,
-          title: 'Gerenciar Membros',
-          onTap: () {
-            // TODO: Implementar gerenciar membros
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildConfigTile(
-          icon: Icons.settings_rounded,
-          title: 'Configurações',
-          onTap: () {
-            // TODO: Implementar configurações
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConfigTile({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.textSecondary.withOpacity(0.12),
-        ),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 22),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-        trailing: Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-        onTap: onTap,
       ),
     );
   }

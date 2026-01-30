@@ -259,11 +259,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Meu Perfil'),
+        centerTitle: true,
+        title: const Text('Meu Perfil', style: TextStyle(fontSize: 18),),
         foregroundColor: AppColors.textLight,
         elevation: 0,
         flexibleSpace: Container(

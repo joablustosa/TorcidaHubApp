@@ -17,9 +17,7 @@ class PostService {
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
-      if (response == null) return [];
-
-      final List<dynamic> data = (response as List? ?? []);
+      final List<dynamic> data = response as List<dynamic>;
       List<Post> posts = [];
 
       for (var item in data) {
@@ -47,7 +45,7 @@ class PostService {
               .select('user_id')
               .eq('post_id', postData['id'].toString());
 
-          final likesList = (likesResponse as List? ?? []) as List;
+          final likesList = likesResponse as List? ?? [];
           postData['likes_count'] = likesList.length;
           postData['user_liked'] = currentUserId != null &&
               likesList.any((e) => (e as Map)['user_id'] == currentUserId);
@@ -62,7 +60,7 @@ class PostService {
               .select('id')
               .eq('post_id', postData['id'].toString());
           
-          postData['comments_count'] = ((commentsResponse as List? ?? []) as List).length;
+          postData['comments_count'] = (commentsResponse as List? ?? []).length;
         } catch (e) {
           print('Erro ao buscar comentários: $e');
         }
@@ -81,16 +79,16 @@ class PostService {
     required String fanClubId,
     required String userId,
     String? content,
-    List<String>? imageUrls,
+    String? imageUrl,
+    bool allowComments = true,
   }) async {
     try {
-      final postData = {
+      final postData = <String, dynamic>{
         'fan_club_id': fanClubId,
         'author_id': userId,
-        'content': content,
-        'image_urls': imageUrls,
-        'is_pinned': false,
-        'allow_comments': true,
+        'content': content ?? '',
+        'image_url': imageUrl,
+        'allow_comments': allowComments,
       };
 
       final response = await SupabaseService.client
@@ -99,7 +97,7 @@ class PostService {
           .select()
           .single();
 
-      return Post.fromJson(response as Map<String, dynamic>);
+      return Post.fromJson(Map<String, dynamic>.from(response as Map));
     } catch (e) {
       print('Erro ao criar post: $e');
       rethrow;
@@ -138,7 +136,8 @@ class PostService {
           .select('id')
           .eq('post_id', postId);
 
-      return ((response as List? ?? []) as List).length;
+      final list = response as List;
+      return list.length;
     } catch (e) {
       print('Erro ao contar likes: $e');
       return 0;

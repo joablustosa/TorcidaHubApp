@@ -295,7 +295,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.album.title),
+        centerTitle: true,
+        title: Text(widget.album.title, style: TextStyle(fontSize: 18),),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),

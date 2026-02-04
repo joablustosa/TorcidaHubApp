@@ -16,6 +16,8 @@ import '../widgets/comment_section.dart';
 import '../widgets/create_event_dialog.dart';
 import '../widgets/create_album_dialog.dart';
 import '../widgets/pix_payment_dialog.dart';
+import '../widgets/store_section.dart';
+import '../widgets/membership_section.dart';
 import 'album_detail_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -71,7 +73,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           args['tabIndex'] != null &&
           mounted) {
         final tab = args['tabIndex'] as int;
-        if (tab >= 0 && tab <= 4) {
+        if (tab >= 0 && tab <= 6) {
           setState(() => _currentTabIndex = tab);
         }
       }
@@ -436,6 +438,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           _buildEventosTab(),
           _buildMembrosTab(),
           _buildAlbunsTab(),
+          _buildLojaTab(),
+          _buildAssinaturaTab(),
           _buildGamificacaoTab(),
         ],
       ),
@@ -475,6 +479,14 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                 BottomNavigationBarItem(
                   icon: Icon(Icons.photo_library_rounded),
                   label: 'Álbuns',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.shopping_bag_rounded),
+                  label: 'Loja',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.account_balance_wallet_rounded),
+                  label: 'Assinatura',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.emoji_events_rounded),
@@ -2073,6 +2085,27 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           _loadData();
         },
       ),
+    );
+  }
+
+  Widget _buildLojaTab() {
+    return StoreSection(
+      fanClubId: widget.fanClubId,
+      memberId: _member?.id,
+    );
+  }
+
+  Widget _buildAssinaturaTab() {
+    if (_member == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+    return MembershipSection(
+      fanClubId: widget.fanClubId,
+      fanClubName: _fanClub?.name ?? 'Torcida',
+      memberId: _member!.id,
+      canManagePlans: _hasPermission('manage_membership_plans'),
     );
   }
 

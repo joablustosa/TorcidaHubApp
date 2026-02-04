@@ -147,11 +147,15 @@ class _PixPaymentDialogState extends State<PixPaymentDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: BoxConstraints(
+          maxWidth: 400,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // Header
             Row(
               children: [
@@ -386,7 +390,8 @@ class _PixPaymentDialogState extends State<PixPaymentDialog> {
                   ),
                 ],
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

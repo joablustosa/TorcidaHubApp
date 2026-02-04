@@ -81,9 +81,10 @@ class _TorcidaHubAppState extends State<TorcidaHubApp> {
   }
 
   Future<void> _checkAuthState() async {
-    // Garantir que a splash seja exibida pelo menos 2 segundos
-    await Future.delayed(const Duration(seconds: 2));
+    // Verificar sessão imediatamente (currentSession é síncrono)
     final session = SupabaseService.auth.currentSession;
+    // Delay mínimo de 400ms para evitar flash rápido da splash
+    await Future.delayed(const Duration(milliseconds: 400));
     if (mounted) {
       setState(() {
         _isAuthenticated = session != null;

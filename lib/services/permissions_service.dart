@@ -78,6 +78,7 @@ class PermissionsService {
       'gerenciar_membros': true,
       'editar_torcida': true,
       'configuracoes': true,
+      'manage_membership_plans': true,
     };
   }
 

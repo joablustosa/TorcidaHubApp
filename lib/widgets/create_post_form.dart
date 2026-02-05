@@ -10,12 +10,18 @@ class CreatePostForm extends StatefulWidget {
   final String fanClubId;
   final String userId;
   final Function(Post)? onPostCreated;
+  /// Se true, exibe opção de marcar publicação como exclusiva para assinantes.
+  final bool allowMembersOnlyPosts;
+  /// Se false (perfil gratuito), o switch "Exclusivo" fica desativado; só assinantes podem publicar exclusivo.
+  final bool canCreateExclusivePost;
 
   const CreatePostForm({
     super.key,
     required this.fanClubId,
     required this.userId,
     this.onPostCreated,
+    this.allowMembersOnlyPosts = false,
+    this.canCreateExclusivePost = true,
   });
 
   @override
@@ -27,6 +33,7 @@ class _CreatePostFormState extends State<CreatePostForm> {
   final ImagePicker _imagePicker = ImagePicker();
   File? _selectedImage;
   bool _allowComments = true;
+  bool _membersOnly = false;
   bool _isSubmitting = false;
 
   Future<void> _pickImage() async {
@@ -105,6 +112,7 @@ class _CreatePostFormState extends State<CreatePostForm> {
             : _contentController.text.trim(),
         imageUrl: imageUrl,
         allowComments: _allowComments,
+        membersOnly: widget.canCreateExclusivePost && _membersOnly,
       );
 
       // Limpar formulário
@@ -112,6 +120,7 @@ class _CreatePostFormState extends State<CreatePostForm> {
       setState(() {
         _selectedImage = null;
         _allowComments = true;
+        _membersOnly = false;
       });
 
       if (mounted) {
@@ -209,18 +218,19 @@ class _CreatePostFormState extends State<CreatePostForm> {
 
             const SizedBox(height: 12),
 
-            // Ações
-            Row(
+            // Opções (foto, comentários, exclusivo)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                // Adicionar foto
                 IconButton(
                   icon: const Icon(Icons.add_photo_alternate),
                   onPressed: _pickImage,
                   color: AppColors.primary,
                 ),
-                const SizedBox(width: 8),
-                // Comentários
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Switch(
                       value: _allowComments,
@@ -235,26 +245,70 @@ class _CreatePostFormState extends State<CreatePostForm> {
                     const Text('Comentários'),
                   ],
                 ),
-                const Spacer(),
-                // Botão publicar
-                ElevatedButton(
-                  onPressed: _isSubmitting ? null : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textLight,
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                if (widget.allowMembersOnlyPosts)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Switch(
+                        value: _membersOnly,
+                        onChanged: widget.canCreateExclusivePost
+                            ? (value) {
+                                setState(() {
+                                  _membersOnly = value;
+                                });
+                              }
+                            : null,
+                        activeColor: AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Exclusivo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: widget.canCreateExclusivePost
+                                  ? AppColors.textSecondary
+                                  : AppColors.textSecondary.withOpacity(0.6),
+                            ),
                           ),
-                        )
-                      : const Text('Publicar'),
-                ),
+                          if (!widget.canCreateExclusivePost)
+                            Text(
+                              'Apenas assinantes',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textSecondary.withOpacity(0.7),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
               ],
+            ),
+            const SizedBox(height: 12),
+            // Botão publicar em linha separada para não quebrar
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: _isSubmitting ? null : _handleSubmit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.textLight,
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Publicar'),
+              ),
             ),
           ],
         ),

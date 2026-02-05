@@ -81,6 +81,7 @@ class PostService {
     String? content,
     String? imageUrl,
     bool allowComments = true,
+    bool membersOnly = false,
   }) async {
     try {
       final postData = <String, dynamic>{
@@ -89,6 +90,7 @@ class PostService {
         'content': content ?? '',
         'image_url': imageUrl,
         'allow_comments': allowComments,
+        'members_only': membersOnly,
       };
 
       final response = await SupabaseService.client

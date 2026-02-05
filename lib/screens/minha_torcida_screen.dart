@@ -18,6 +18,7 @@ import '../widgets/create_album_dialog.dart';
 import '../widgets/pix_payment_dialog.dart';
 import '../widgets/store_section.dart';
 import '../widgets/membership_section.dart';
+import '../services/membership_service.dart';
 import 'album_detail_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -57,6 +58,10 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
   Map<String, Profile> _memberProfiles = {};
   /// Cargos da torcida (id, name) para alterar função do membro.
   List<Map<String, dynamic>> _fanClubPositions = [];
+  /// Configurações de acesso (posts/eventos exclusivos) e assinatura para conteúdo exclusivo.
+  bool _accessRequiresMembership = false;
+  MembershipAccessConfig? _accessSettings;
+  MemberSubscription? _memberSubscription;
 
   @override
   void initState() {
@@ -93,6 +98,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
       await _fetchMembers();
       await _fetchFanClubPositions();
       await _fetchPermissions();
+      await _fetchAccessAndSubscription();
     } catch (e) {
       print('Erro ao carregar dados: $e');
     } finally {
@@ -298,6 +304,33 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
         _permissionsLoading = false;
       });
     }
+  }
+
+  Future<void> _fetchAccessAndSubscription() async {
+    try {
+      final access = await MembershipService.getAccessSettings(widget.fanClubId);
+      if (!mounted) return;
+      setState(() {
+        _accessRequiresMembership = access.requiresMembership;
+        _accessSettings = access.settings;
+      });
+      if (_member != null) {
+        final sub = await MembershipService.getMemberSubscription(_member!.id);
+        if (mounted) {
+          setState(() => _memberSubscription = sub);
+        }
+      }
+    } catch (e) {
+      print('Erro ao buscar acesso/assinatura: $e');
+    }
+  }
+
+  /// Usuário pode ver publicações exclusivas (posts): se a torcida não exige taxa ou não tem posts_exclusive, sim; senão, só se estiver inscrito.
+  bool _canAccessExclusivePosts() {
+    if (!_accessRequiresMembership) return true;
+    if (_accessSettings == null) return true;
+    if (!_accessSettings!.postsExclusive) return true;
+    return _memberSubscription?.isSubscribed ?? false;
   }
 
   bool _hasPermission(String permissionKey) {
@@ -522,6 +555,9 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
               onPostCreated: (_) {
                 _loadData();
               },
+              allowMembersOnlyPosts: _accessSettings?.postsExclusive ?? false,
+              canCreateExclusivePost: (_accessSettings?.postsExclusive ?? false) &&
+                  (_memberSubscription?.isSubscribed ?? false),
             ),
           const SizedBox(height: 16),
           
@@ -587,7 +623,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
 
         return Column(
           children: posts.map((post) {
-            final commentsExpanded = (post.allowComments ?? true) &&
+            final commentsExpanded = post.allowComments &&
                 _expandedCommentsPostId == post.id;
 
             final postCard = PostCard(
@@ -595,6 +631,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
               isAdmin: _isAdmin,
               canEdit: _hasPermission('editar_publicacoes') || post.userId == _authService.userId,
               canDelete: _hasPermission('deletar_publicacoes') || post.userId == _authService.userId,
+              isMembersOnly: post.membersOnly,
+              canAccessPost: _canAccessExclusivePosts(),
               onLike: () async {
                 await PostService.likePost(post.id, _authService.userId!);
                 _refreshPosts();

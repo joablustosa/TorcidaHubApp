@@ -214,6 +214,8 @@ class Post {
   final List<String>? imageUrls;
   final bool isPinned;
   final bool allowComments;
+  /// Conteúdo exclusivo para membros com assinatura ativa.
+  final bool membersOnly;
   final int likesCount;
   final int commentsCount;
   final bool userLiked;
@@ -231,6 +233,7 @@ class Post {
     this.imageUrls,
     this.isPinned = false,
     this.allowComments = true,
+    this.membersOnly = false,
     this.likesCount = 0,
     this.commentsCount = 0,
     this.userLiked = false,
@@ -257,6 +260,7 @@ class Post {
           : null,
       isPinned: json['is_pinned'] as bool? ?? false,
       allowComments: json['allow_comments'] as bool? ?? true,
+      membersOnly: json['members_only'] as bool? ?? false,
       likesCount: json['likes_count'] as int? ?? 0,
       commentsCount: json['comments_count'] as int? ?? 0,
       userLiked: json['user_liked'] as bool? ?? false,
@@ -279,6 +283,7 @@ class Post {
       'image_urls': imageUrls,
       'is_pinned': isPinned,
       'allow_comments': allowComments,
+      'members_only': membersOnly,
       'likes_count': likesCount,
       'comments_count': commentsCount,
       'created_at': createdAt.toIso8601String(),

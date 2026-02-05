@@ -17,6 +17,10 @@ class PostCard extends StatelessWidget {
   final bool showComments;
   /// Quando false, não envolve em Card (para ser usado dentro de um Card único com comentários).
   final bool embedInCard;
+  /// Post é exclusivo para assinantes.
+  final bool isMembersOnly;
+  /// Usuário tem permissão para ver conteúdo exclusivo (assinatura ativa).
+  final bool canAccessPost;
 
   const PostCard({
     super.key,
@@ -31,6 +35,8 @@ class PostCard extends StatelessWidget {
     this.onComment,
     this.showComments = false,
     this.embedInCard = true,
+    this.isMembersOnly = false,
+    this.canAccessPost = true,
   });
 
   String _formatDate(DateTime date) {
@@ -131,6 +137,38 @@ class PostCard extends StatelessWidget {
                               ),
                             ),
                           ],
+                          if (isMembersOnly) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.workspace_premium,
+                                    size: 12,
+                                    color: Colors.amber.shade700,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'Exclusivo',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.amber.shade700,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 2),
@@ -222,101 +260,147 @@ class PostCard extends StatelessWidget {
             ),
           ),
 
-          // Conteúdo
-          if (post.content != null && post.content!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                post.content!,
-                style: const TextStyle(fontSize: 14),
+          // Conteúdo (bloqueado para exclusivo sem acesso ou conteúdo normal)
+          if (isMembersOnly && !canAccessPost) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-
-          // Imagem
-          if (post.imageUrl != null || (post.imageUrls != null && post.imageUrls!.isNotEmpty))
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: CachedNetworkImage(
-                imageUrl: post.imageUrl ?? post.imageUrls!.first,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                placeholder: (context, url) => Container(
-                  height: 300,
-                  color: AppColors.background,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.lock_outline,
+                      size: 32,
+                      color: Colors.amber.shade700,
                     ),
                   ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  height: 300,
-                  color: AppColors.background,
-                  child: const Icon(Icons.error),
-                ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Conteúdo Exclusivo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Disponível apenas para membros com assinatura ativa',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ] else ...[
+            if (post.content != null && post.content!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  post.content!,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
 
-          // Ações (Like, Comment)
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                // Like
-                InkWell(
-                  onTap: post.userLiked ? onUnlike : onLike,
-                  child: Row(
-                    children: [
-                      Icon(
-                        post.userLiked ? Icons.favorite : Icons.favorite_border,
-                        color: post.userLiked ? AppColors.error : AppColors.textSecondary,
-                        size: 24,
+            // Imagem
+            if (post.imageUrl != null || (post.imageUrls != null && post.imageUrls!.isNotEmpty))
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: CachedNetworkImage(
+                  imageUrl: post.imageUrl ?? post.imageUrls!.first,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  placeholder: (context, url) => Container(
+                    height: 300,
+                    color: AppColors.background,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${post.likesCount}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    height: 300,
+                    color: AppColors.background,
+                    child: const Icon(Icons.error),
                   ),
                 ),
-                const SizedBox(width: 24),
-                // Comment
-                InkWell(
-                  onTap: onComment,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.comment_outlined,
-                        color: AppColors.textSecondary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${post.commentsCount}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
+              ),
+
+            // Ações (Like, Comment)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // Like
+                  InkWell(
+                    onTap: post.userLiked ? onUnlike : onLike,
+                    child: Row(
+                      children: [
+                        Icon(
+                          post.userLiked ? Icons.favorite : Icons.favorite_border,
+                          color: post.userLiked ? AppColors.error : AppColors.textSecondary,
+                          size: 24,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Text(
+                          '${post.likesCount}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const Spacer(),
-                // Share
-                IconButton(
-                  icon: const Icon(Icons.share_outlined),
-                  color: AppColors.textSecondary,
-                  onPressed: () {
-                    // TODO: Implementar compartilhar
-                  },
-                ),
-              ],
+                  const SizedBox(width: 24),
+                  // Comment
+                  InkWell(
+                    onTap: onComment,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.comment_outlined,
+                          color: AppColors.textSecondary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${post.commentsCount}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  // Share
+                  IconButton(
+                    icon: const Icon(Icons.share_outlined),
+                    color: AppColors.textSecondary,
+                    onPressed: () {
+                      // TODO: Implementar compartilhar
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       );
 

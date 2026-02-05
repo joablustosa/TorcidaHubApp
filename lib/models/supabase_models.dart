@@ -394,3 +394,51 @@ class Event {
   }
 }
 
+/// Plano de assinatura da torcida (pago por membros).
+class SubscriptionPlan {
+  final String id;
+  final String? fanClubId;
+  final String name;
+  final String? description;
+  final double price;
+  final String interval; // 'monthly' | 'yearly'
+  final List<String>? features;
+  final bool isActive;
+  final DateTime? createdAt;
+
+  SubscriptionPlan({
+    required this.id,
+    this.fanClubId,
+    required this.name,
+    this.description,
+    required this.price,
+    this.interval = 'monthly',
+    this.features,
+    this.isActive = true,
+    this.createdAt,
+  });
+
+  factory SubscriptionPlan.fromJson(Map<String, dynamic> json) {
+    List<String>? featuresList;
+    if (json['features'] != null) {
+      if (json['features'] is List) {
+        featuresList = (json['features'] as List).map((e) => e.toString()).toList();
+      }
+    }
+    return SubscriptionPlan(
+      id: json['id'] as String,
+      fanClubId: json['fan_club_id'] as String?,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      interval: json['interval'] as String? ?? 'monthly',
+      features: featuresList,
+      isActive: json['is_active'] as bool? ?? true,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
+    );
+  }
+
+  String get intervalLabel => interval == 'yearly' ? 'ano' : 'mês';
+}

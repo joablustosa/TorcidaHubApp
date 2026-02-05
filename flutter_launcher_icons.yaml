@@ -1,10 +1,9 @@
-# Ícone do app (atalho na tela inicial) - apenas launcher icon
-# 1) Logo maior no atalho: adaptive_icon_foreground_inset 0 = menos margem = logo ocupa mais espaço
-# 2) Cor de fundo que combina com a logo (verde claro) e não embola a visualização
+# Ícone do app (atalho na tela inicial do celular) – NÃO altera a logo da tela de login.
+# A tela de login usa assets/logo.png. Este arquivo usa assets/icon_launcher.png.
 flutter_launcher_icons:
   android: true
-  ios: true
-  image_path: "assets/logo.png"
+  ios: false   # projeto não tem pasta ios; ative quando criar projeto iOS
+  image_path: "assets/icon_launcher.png"
   adaptive_icon_background: "#E8F5E9"
-  adaptive_icon_foreground: "assets/logo.png"
+  adaptive_icon_foreground: "assets/icon_launcher.png"
   adaptive_icon_foreground_inset: 0

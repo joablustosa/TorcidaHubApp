@@ -12,6 +12,7 @@ import '../widgets/ranking_list.dart';
 import '../widgets/digital_card.dart';
 import '../services/album_service.dart';
 import '../services/permissions_service.dart';
+import '../services/subscription_service.dart';
 import '../widgets/comment_section.dart';
 import '../widgets/create_event_dialog.dart';
 import '../widgets/create_album_dialog.dart';
@@ -57,10 +58,13 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
   Map<String, Profile> _memberProfiles = {};
   /// Cargos da torcida (id, name) para alterar função do membro.
   List<Map<String, dynamic>> _fanClubPositions = [];
+  /// Planos de assinatura (visíveis para todos os membros, inclusive membro comum).
+  Future<List<SubscriptionPlan>>? _plansFuture;
 
   @override
   void initState() {
     super.initState();
+    _plansFuture = SubscriptionService.getPlansForFanClub(widget.fanClubId);
     _postsFuture = PostService.getPosts(
       fanClubId: widget.fanClubId,
       limit: 20,
@@ -513,7 +517,9 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           // Header da torcida
           _buildFanClubHeader(),
           const SizedBox(height: 24),
-          
+          // Planos de assinatura – visível para TODOS os membros (incluindo membro comum)
+          _buildPlanosSection(),
+          const SizedBox(height: 24),
           // Formulário de criar publicação
           if (_hasPermission('criar_publicacoes') && _authService.userId != null)
             CreatePostForm(
@@ -530,6 +536,219 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
         ],
       ),
     );
+  }
+
+  /// Seção de planos de assinatura – visível para todos os membros (membro comum, diretoria, presidente).
+  Widget _buildPlanosSection() {
+    final future = _plansFuture ?? SubscriptionService.getPlansForFanClub(widget.fanClubId);
+    return FutureBuilder<List<SubscriptionPlan>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 80,
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+              ),
+            ),
+          );
+        }
+        final plans = snapshot.data ?? [];
+        if (plans.isEmpty) return const SizedBox.shrink();
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.card_membership_rounded, color: AppColors.primary, size: 24),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Planos',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Assine um plano e apoie a torcida. Qualquer membro pode assinar.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ...plans.map((plan) => _buildPlanCard(plan)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlanCard(SubscriptionPlan plan) {
+    final priceStr = plan.price > 0
+        ? 'R\$ ${plan.price.toStringAsFixed(2).replaceAll('.', ',')}/${plan.intervalLabel}'
+        : 'Grátis';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  plan.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Text(
+                priceStr,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          if (plan.description != null && plan.description!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              plan.description!,
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ],
+          if (plan.features != null && plan.features!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...plan.features!.take(4).map((f) => Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, size: 16, color: AppColors.success),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(f, style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                ],
+              ),
+            )),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _authService.userId == null
+                  ? null
+                  : () => _handleAssinarPlano(plan),
+              icon: const Icon(Icons.payment_rounded, size: 20),
+              label: const Text('Assinar plano'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textLight,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAssinarPlano(SubscriptionPlan plan) async {
+    if (_authService.userId == null) return;
+    try {
+      final paymentData = await SubscriptionService.subscribeToPlan(
+        planId: plan.id,
+        userId: _authService.userId!,
+        fanClubId: widget.fanClubId,
+        price: plan.price,
+      );
+
+      if (!mounted) return;
+
+      if (plan.price > 0 && paymentData != null) {
+        final orderId = paymentData['order_id'] as String? ?? '';
+        final qrCode = paymentData['qr_code'] as String? ?? '';
+        final expiresAt = paymentData['expires_at'] != null
+            ? DateTime.parse(paymentData['expires_at'] as String)
+            : DateTime.now().add(const Duration(minutes: 30));
+        final fee = plan.price * 0.0499;
+        showDialog(
+          context: context,
+          builder: (context) => PixPaymentDialog(
+            orderId: orderId,
+            qrCode: qrCode,
+            qrCodeUrl: paymentData['qr_code_url'] as String?,
+            expiresAt: expiresAt,
+            baseAmount: plan.price,
+            fee: fee,
+            total: plan.price + fee,
+            itemName: plan.name,
+            onPaymentConfirmed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Pagamento confirmado! Assinatura ativa.'),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+        );
+      } else if (plan.price <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Plano ativado com sucesso!'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Pagamento via PIX em breve. Entre em contato com a diretoria para assinar este plano.',
+            ),
+            backgroundColor: AppColors.info,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao assinar: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildPostsList() {

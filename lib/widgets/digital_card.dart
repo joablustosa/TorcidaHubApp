@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
@@ -9,12 +10,15 @@ class DigitalCard extends StatelessWidget {
   final FanClubMember member;
   final FanClub fanClub;
   final Profile? profile;
+  /// Tipo de assinatura do membro (ex.: "Plano Premium", "Sem assinatura"). Quando null, a linha não é exibida.
+  final String? subscriptionType;
 
   const DigitalCard({
     super.key,
     required this.member,
     required this.fanClub,
     this.profile,
+    this.subscriptionType,
   });
 
   String _getPositionLabel(String position) {
@@ -164,10 +168,10 @@ class DigitalCard extends StatelessWidget {
                 // Content
                 Container(
                   padding: EdgeInsets.fromLTRB(
-                    isNarrow ? 12 : 20,
-                    16,
-                    isNarrow ? 12 : 20,
-                    20,
+                    isNarrow ? 12 : 16,
+                    10,
+                    isNarrow ? 12 : 16,
+                    14,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -180,11 +184,13 @@ class DigitalCard extends StatelessWidget {
                     nickname: nickname,
                     avatarUrl: avatarUrl,
                     joinDate: joinDate,
+                    subscriptionType: subscriptionType,
                   ) : _buildWideLayout(
                     displayName: displayName,
                     nickname: nickname,
                     avatarUrl: avatarUrl,
                     joinDate: joinDate,
+                    subscriptionType: subscriptionType,
                   ),
                 ),
               ],
@@ -200,21 +206,41 @@ class DigitalCard extends StatelessWidget {
     required String? nickname,
     required String? avatarUrl,
     required String joinDate,
+    String? subscriptionType,
   }) {
+    const double avatarSize = 72;
+    // Uma linha: [foto+logo empilhados] | nome+detalhes | QR grande (mesma altura, sem aumentar o card)
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildAvatarColumn(displayName: displayName, avatarUrl: avatarUrl),
-        const SizedBox(width: 20),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildAvatarColumn(displayName: displayName, avatarUrl: avatarUrl, size: avatarSize),
+            const SizedBox(height: 4),
+            _buildLogoOnly(avatarSize),
+          ],
+        ),
+        const SizedBox(width: 12),
         Expanded(
-          child: _buildMemberInfo(
-            displayName: displayName,
-            nickname: nickname,
-            joinDate: joinDate,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildMemberInfo(
+                displayName: displayName,
+                nickname: nickname,
+              ),
+              const SizedBox(height: 8),
+              _buildMemberDetailsVertical(
+                joinDate: joinDate,
+                subscriptionType: subscriptionType,
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 16),
-        _buildQRSection(),
+        const SizedBox(width: 12),
+        _buildQRSection(size: 110, compact: true),
       ],
     );
   }
@@ -224,10 +250,14 @@ class DigitalCard extends StatelessWidget {
     required String? nickname,
     required String? avatarUrl,
     required String joinDate,
+    String? subscriptionType,
   }) {
+    const double size = 64;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
+        // Primeira linha: foto + nome/apelido + QR (posição original)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -235,20 +265,34 @@ class DigitalCard extends StatelessWidget {
             _buildAvatarColumn(
               displayName: displayName,
               avatarUrl: avatarUrl,
-              size: 72,
+              size: size,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 10),
             Expanded(
               child: _buildMemberInfo(
                 displayName: displayName,
                 nickname: nickname,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _buildQRSection(size: 72, compact: true),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildLogoOnly(size),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildMemberDetailsVertical(
                 joinDate: joinDate,
+                subscriptionType: subscriptionType,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        _buildQRSection(size: 100),
       ],
     );
   }
@@ -258,66 +302,64 @@ class DigitalCard extends StatelessWidget {
     required String? avatarUrl,
     double size = 96,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.primary,
-              width: 2,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: avatarUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: avatarUrl,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) {
-                      return _avatarPlaceholder(displayName, size);
-                    },
-                  )
-                : _avatarPlaceholder(displayName, size),
-          ),
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary,
+          width: 2,
         ),
-        const SizedBox(height: 8),
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.primary,
-              width: 2,
-            ),
-            color: Colors.white,
-          ),
-          child: fanClub.logoUrl != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
-                    imageUrl: fanClub.logoUrl!,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) {
-                      return Icon(
-                        Icons.shield,
-                        size: size * 0.5,
-                        color: AppColors.primary,
-                      );
-                    },
-                  ),
-                )
-              : Icon(
-                  Icons.shield,
-                  size: size * 0.5,
-                  color: AppColors.primary,
-                ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: avatarUrl != null
+            ? CachedNetworkImage(
+                imageUrl: avatarUrl,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) {
+                  return _avatarPlaceholder(displayName, size);
+                },
+              )
+            : _avatarPlaceholder(displayName, size),
+      ),
+    );
+  }
+
+  /// Apenas o logo da torcida (usado ao lado das informações do membro).
+  Widget _buildLogoOnly(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary,
+          width: 2,
         ),
-      ],
+        color: Colors.white,
+      ),
+      child: fanClub.logoUrl != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: CachedNetworkImage(
+                imageUrl: fanClub.logoUrl!,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) {
+                  return Icon(
+                    Icons.shield,
+                    size: size * 0.5,
+                    color: AppColors.primary,
+                  );
+                },
+              ),
+            )
+          : Icon(
+              Icons.shield,
+              size: size * 0.5,
+              color: AppColors.primary,
+            ),
     );
   }
 
@@ -340,7 +382,6 @@ class DigitalCard extends StatelessWidget {
   Widget _buildMemberInfo({
     required String displayName,
     required String? nickname,
-    required String joinDate,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,7 +410,19 @@ class DigitalCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  /// Informações do membro em formato vertical (um dado em cima do outro), ao lado do logo da torcida.
+  Widget _buildMemberDetailsVertical({
+    required String joinDate,
+    String? subscriptionType,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
         Row(
           children: [
             Icon(Icons.shield, size: 16, color: AppColors.primary),
@@ -380,6 +433,7 @@ class DigitalCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -390,17 +444,30 @@ class DigitalCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(
-                Icons.calendar_today,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
+              Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
                   'Membro desde $joinDate',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (subscriptionType != null && subscriptionType.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(Icons.card_membership_rounded, size: 14, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Assinatura: $subscriptionType',
                   style: TextStyle(
                     fontSize: 12,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -410,9 +477,7 @@ class DigitalCard extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
+        Row(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -426,11 +491,7 @@ class DigitalCard extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.star,
-                    size: 12,
-                    color: _getBadgeColor(member.badgeLevel),
-                  ),
+                  Icon(Icons.star, size: 12, color: _getBadgeColor(member.badgeLevel)),
                   const SizedBox(width: 4),
                   Text(
                     _getBadgeLabel(member.badgeLevel),
@@ -443,6 +504,7 @@ class DigitalCard extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -459,7 +521,7 @@ class DigitalCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     '${member.points} pts',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
@@ -474,42 +536,44 @@ class DigitalCard extends StatelessWidget {
     );
   }
 
-  Widget _buildQRSection({double size = 120}) {
-    return _ZoomableQR(
+  Widget _buildQRSection({double size = 120, bool compact = false}) {
+    return _QRTapToExpand(
       qrData: _generateQRData(),
       baseSize: size,
+      compact: compact,
     );
   }
 }
 
-/// QR Code que expande com zoom ao toque; toque novamente para remover o zoom.
-class _ZoomableQR extends StatefulWidget {
+/// QR Code na carteirinha: toque abre overlay em tela cheia (tela escura, QR grande, botão fechar).
+class _QRTapToExpand extends StatelessWidget {
   final String qrData;
   final double baseSize;
+  final bool compact;
 
-  const _ZoomableQR({
+  const _QRTapToExpand({
     required this.qrData,
     this.baseSize = 120,
+    this.compact = false,
   });
 
-  @override
-  State<_ZoomableQR> createState() => _ZoomableQRState();
-}
-
-class _ZoomableQRState extends State<_ZoomableQR> {
-  bool _zoomed = false;
-
-  static const double _zoomScale = 2.0;
+  void _showFullScreenQR(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      barrierDismissible: true,
+      builder: (ctx) => _QRFullScreenOverlay(qrData: qrData),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final size = widget.baseSize;
+    final padding = compact ? 6.0 : 12.0;
+    final spacing = compact ? 2.0 : 6.0;
     return GestureDetector(
-      onTap: () {
-        setState(() => _zoomed = !_zoomed);
-      },
+      onTap: () => _showFullScreenQR(context),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(padding),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -520,22 +584,17 @@ class _ZoomableQRState extends State<_ZoomableQR> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedScale(
-              scale: _zoomed ? _zoomScale : 1.0,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
-              child: QrImageView(
-                data: widget.qrData,
-                version: QrVersions.auto,
-                size: size,
-                backgroundColor: Colors.white,
-              ),
+            QrImageView(
+              data: qrData,
+              version: QrVersions.auto,
+              size: baseSize,
+              backgroundColor: Colors.white,
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: spacing),
             Text(
-              _zoomed ? 'Toque para reduzir' : 'Toque para ampliar',
+              'Toque para ampliar',
               style: TextStyle(
-                fontSize: 10,
+                fontSize: compact ? 9 : 10,
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.bold,
               ),
@@ -543,8 +602,127 @@ class _ZoomableQRState extends State<_ZoomableQR> {
             Text(
               'Validação Digital',
               style: TextStyle(
-                fontSize: 9,
+                fontSize: compact ? 8 : 9,
                 color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Overlay em tela cheia com glass effect: blur + fundo semi-transparente, QR e botão Fechar ao centro.
+class _QRFullScreenOverlay extends StatelessWidget {
+  final String qrData;
+
+  const _QRFullScreenOverlay({required this.qrData});
+
+  static const double _qrSize = 280;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.zero,
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Glass effect: blur do conteúdo atrás + overlay semi-transparente
+            Positioned.fill(
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    color: Colors.white.withOpacity(0.15),
+                  ),
+                ),
+              ),
+            ),
+            // Conteúdo central: card com QR e botão Fechar
+            Center(
+              child: Material(
+                color: Colors.transparent,
+                child: GestureDetector(
+                  onTap: () {}, // evita fechar ao tocar no card
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.8),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 32,
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        QrImageView(
+                          data: qrData,
+                          version: QrVersions.auto,
+                          size: _qrSize,
+                          backgroundColor: Colors.white,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Validação Digital',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).pop(),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppColors.primary.withOpacity(0.35),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.close_rounded, color: AppColors.primary, size: 22),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Fechar',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

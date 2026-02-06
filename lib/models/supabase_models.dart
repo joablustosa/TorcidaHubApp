@@ -442,3 +442,43 @@ class SubscriptionPlan {
 
   String get intervalLabel => interval == 'yearly' ? 'ano' : 'mês';
 }
+
+/// Notificação do usuário (exibida após o login).
+/// Schema alinhado com a WEB App: tabela notifications (is_read, message, type, reference_id, fan_club_id).
+class AppNotification {
+  final String id;
+  final String userId;
+  final String title;
+  final String? message;
+  final String? type;
+  final bool isRead;
+  final DateTime createdAt;
+  final String? fanClubId;
+  final String? referenceId;
+
+  AppNotification({
+    required this.id,
+    required this.userId,
+    required this.title,
+    this.message,
+    this.type,
+    this.isRead = false,
+    required this.createdAt,
+    this.fanClubId,
+    this.referenceId,
+  });
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    return AppNotification(
+      id: json['id'] as String,
+      userId: json['user_id'] as String,
+      title: json['title'] as String,
+      message: json['message'] as String?,
+      type: json['type'] as String?,
+      isRead: json['is_read'] as bool? ?? false,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      fanClubId: json['fan_club_id'] as String?,
+      referenceId: json['reference_id'] as String?,
+    );
+  }
+}

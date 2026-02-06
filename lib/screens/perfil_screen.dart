@@ -592,8 +592,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
         ),
       ),
       bottomNavigationBar: TorcidaHubBottomNav(
-        currentIndex: 4,
-        onTap: (index) => TorcidaHubBottomNav.navigateTo(context, index, 4),
+        currentIndex: 0,
+        onTap: (index) => TorcidaHubBottomNav.navigateTo(context, index, 0),
       ),
     );
   }

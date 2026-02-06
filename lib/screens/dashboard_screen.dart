@@ -12,6 +12,10 @@ import 'criar_torcida_screen.dart';
 import 'criar_time_screen.dart';
 import 'buscar_torcidas_screen.dart';
 import 'entrar_torcida_screen.dart';
+import 'notifications_screen.dart';
+import 'event_story_screen.dart';
+import '../services/notification_service.dart';
+import '../services/viewed_stories_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -26,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Map<String, dynamic>> _memberships = [];
   List<Map<String, dynamic>> _pendingRequests = [];
   List<Event> _upcomingEvents = [];
+  Set<String> _viewedStoryFanClubIds = {};
 
   @override
   void initState() {
@@ -53,6 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _fetchPendingRequests(),
       ]);
       await _fetchUpcomingEvents();
+      await _loadViewedStoryFanClubIds();
     } catch (e) {
       print('Erro ao carregar dados: $e');
     } finally {
@@ -215,6 +221,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _loadViewedStoryFanClubIds() async {
+    try {
+      final set = await ViewedStoriesService.getViewedFanClubIds();
+      if (mounted) setState(() => _viewedStoryFanClubIds = set);
+    } catch (_) {
+      if (mounted) setState(() => _viewedStoryFanClubIds = {});
+    }
+  }
+
   bool _isAmateurTeam(String? clubType) {
     if (clubType == null) return false;
     return ['amateur_team', 'neighborhood_team', 'school_team', 'work_team']
@@ -268,24 +283,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildEventCircleImage(Event event) {
-    final imageUrl = event.imageUrl != null && event.imageUrl!.trim().isNotEmpty
-        ? event.imageUrl
-        : _getFanClubLogoUrl(event.fanClubId);
-    if (imageUrl == null || imageUrl.trim().isEmpty) {
-      return _buildEventCirclePlaceholder();
+  /// Agrupa eventos por torcida; retorna uma entrada por torcida (com lista de eventos).
+  List<Map<String, dynamic>> _getEventsByFanClub() {
+    final Map<String, List<Event>> byClub = {};
+    for (final e in _upcomingEvents) {
+      byClub.putIfAbsent(e.fanClubId, () => []).add(e);
     }
-    return CachedNetworkImage(
-      imageUrl: imageUrl,
-      fit: BoxFit.cover,
-      width: 72,
-      height: 72,
-      placeholder: (_, __) => _buildEventCirclePlaceholder(),
-      errorWidget: (_, __, ___) => _buildEventCirclePlaceholder(),
-    );
+    for (final list in byClub.values) {
+      list.sort((a, b) => a.eventDate.compareTo(b.eventDate));
+    }
+    final List<Map<String, dynamic>> result = [];
+    for (final entry in byClub.entries) {
+      final fanClubId = entry.key;
+      final events = entry.value;
+      String name = 'Torcida';
+      String? logoUrl;
+      try {
+        final m = _memberships.firstWhere(
+          (m) => (m['fan_club_id'] as String?) == fanClubId,
+        );
+        final fc = m['fan_clubs'] as Map<String, dynamic>?;
+        name = fc?['name'] as String? ?? fc?['team_name'] as String? ?? 'Torcida';
+        logoUrl = fc?['logo_url'] as String?;
+      } catch (_) {}
+      result.add({
+        'fanClubId': fanClubId,
+        'fanClubName': name,
+        'logoUrl': logoUrl,
+        'events': events,
+      });
+    }
+    result.sort((a, b) {
+      final aName = a['fanClubName'] as String;
+      final bName = b['fanClubName'] as String;
+      return aName.compareTo(bName);
+    });
+    return result;
   }
 
   Widget _buildEventsHorizontalList() {
+    final byClub = _getEventsByFanClub();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -305,20 +342,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            itemCount: _upcomingEvents.length,
+            itemCount: byClub.length,
             itemBuilder: (context, index) {
-              final event = _upcomingEvents[index];
+              final item = byClub[index];
+              final fanClubId = item['fanClubId'] as String;
+              final fanClubName = item['fanClubName'] as String;
+              final logoUrl = item['logoUrl'] as String?;
+              final events = item['events'] as List<Event>;
+              final firstEvent = events.isNotEmpty ? events.first : null;
+              final hasNewStories = events.isNotEmpty && !_viewedStoryFanClubIds.contains(fanClubId);
               return Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: SizedBox(
                   height: 112,
                   width: 80,
                   child: InkWell(
-                    onTap: () {
-                      Navigator.of(context).pushNamed(
-                        '/minha-torcida/${event.fanClubId}',
-                        arguments: {'tabIndex': 1},
+                    onTap: () async {
+                      final argsList = byClub
+                          .map((i) => EventStoryScreenArgs(
+                                fanClubId: i['fanClubId'] as String,
+                                fanClubName: i['fanClubName'] as String,
+                                logoUrl: i['logoUrl'] as String?,
+                                events: i['events'] as List<Event>,
+                              ))
+                          .toList();
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EventStoryScreen(
+                            argsList: argsList,
+                          ),
+                        ),
                       );
+                      if (mounted) await _loadViewedStoryFanClubIds();
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Column(
@@ -330,8 +385,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: AppColors.primary.withOpacity(0.5),
-                              width: 2,
+                              color: hasNewStories
+                                  ? AppColors.primary
+                                  : AppColors.primary.withOpacity(0.5),
+                              width: hasNewStories ? 3 : 2,
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -342,7 +399,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                           child: ClipOval(
-                            child: _buildEventCircleImage(event),
+                            child: _buildTorcidaCircleImage(logoUrl, firstEvent),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -351,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: SizedBox(
                               width: 80,
                               child: Text(
-                                event.title,
+                                fanClubName,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
@@ -373,6 +430,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTorcidaCircleImage(String? logoUrl, Event? firstEvent) {
+    final imageUrl = logoUrl?.trim().isNotEmpty == true
+        ? logoUrl
+        : (firstEvent != null &&
+                firstEvent.imageUrl != null &&
+                firstEvent.imageUrl!.trim().isNotEmpty)
+            ? firstEvent.imageUrl
+            : null;
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return _buildEventCirclePlaceholder();
+    }
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.cover,
+      width: 72,
+      height: 72,
+      placeholder: (_, __) => _buildEventCirclePlaceholder(),
+      errorWidget: (_, __, ___) => _buildEventCirclePlaceholder(),
     );
   }
 
@@ -498,8 +576,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Row(
               children: [
-                // Avatar (foto ou iniciais)
-                _buildUserAvatar(),
+                // Avatar (foto ou iniciais) – toque leva ao perfil
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PerfilScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(24),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: _buildUserAvatar(),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -527,6 +619,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
+                // Ícone de notificações (após o login)
+                FutureBuilder<int>(
+                  future: _authService.userId != null
+                      ? NotificationService.getUnreadCount(_authService.userId!)
+                      : Future.value(0),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data ?? 0;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          onPressed: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                            );
+                            if (mounted) setState(() {});
+                          },
+                          icon: const Icon(Icons.notifications_rounded, size: 24),
+                          color: AppColors.textLight,
+                          tooltip: 'Notificações',
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.textLight.withOpacity(0.15),
+                          ),
+                        ),
+                        if (unreadCount > 0)
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: AppColors.accentRed,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                              child: Text(
+                                unreadCount > 99 ? '99+' : '$unreadCount',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(width: 4),
                 IconButton(
                   onPressed: _handleSignOut,
                   icon: const Icon(Icons.logout_rounded, size: 22),
@@ -699,11 +842,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             case 3:
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const EntrarTorcidaScreen()),
-              );
-              break;
-            case 4:
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PerfilScreen()),
               );
               break;
           }

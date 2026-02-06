@@ -4,10 +4,8 @@ import '../screens/criar_time_screen.dart';
 import '../screens/criar_torcida_screen.dart';
 import '../screens/buscar_torcidas_screen.dart';
 import '../screens/entrar_torcida_screen.dart';
-import '../screens/perfil_screen.dart';
-
-/// Bottom navigation compartilhado entre Dashboard e as 5 telas de ação.
-/// [currentIndex] 0=Criar Time, 1=Buscar, 2=Criar Torcida, 3=Convite, 4=Perfil.
+/// Bottom navigation compartilhado entre Dashboard e as 4 telas de ação.
+/// [currentIndex] 0=Criar Time, 1=Buscar, 2=Criar Torcida, 3=Convite. (Perfil acessível pelo avatar no header.)
 /// No Dashboard use [currentIndex: 0] para que, ao voltar, nenhum outro fique destacado.
 class TorcidaHubBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -39,8 +37,6 @@ class TorcidaHubBottomNav extends StatelessWidget {
         return const CriarTorcidaScreen();
       case 3:
         return const EntrarTorcidaScreen();
-      case 4:
-        return const PerfilScreen();
       default:
         return const CriarTimeScreen();
     }
@@ -63,7 +59,7 @@ class TorcidaHubBottomNav extends StatelessWidget {
         child: ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           child: BottomNavigationBar(
-            currentIndex: currentIndex.clamp(0, 4),
+            currentIndex: currentIndex.clamp(0, 3),
             onTap: onTap,
             type: BottomNavigationBarType.fixed,
             selectedItemColor: AppColors.primary,
@@ -84,10 +80,6 @@ class TorcidaHubBottomNav extends StatelessWidget {
               BottomNavigationBarItem(
                 icon: Icon(Icons.group_add),
                 label: 'Convite',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline_rounded),
-                label: 'Perfil',
               ),
             ],
           ),

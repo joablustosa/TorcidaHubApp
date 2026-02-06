@@ -90,7 +90,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String labelText,
     required String hintText,
     required IconData prefixIcon,
-    Widget? suffixIcon,
+    Widget? suffixIcon, 
   }) {
     return InputDecoration(
       labelText: labelText,

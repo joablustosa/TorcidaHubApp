@@ -53,8 +53,10 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
   final Set<String> _registeredEventIds = {};
   /// IDs de eventos em que o usuário cancelou a inscrição nesta sessão.
   final Set<String> _cancelledEventIds = {};
-  /// Lista de membros da torcida (aba Membros).
+  /// Lista de membros da torcida (aba Membros). Limitada a 300.
   List<FanClubMember> _members = [];
+  /// Filtro de pesquisa na aba Membros (nome ou apelido).
+  String _memberSearchQuery = '';
   /// Perfis dos membros (user_id -> Profile).
   Map<String, Profile> _memberProfiles = {};
   /// Cargos da torcida (id, name) para alterar função do membro.
@@ -209,7 +211,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           .eq('fan_club_id', widget.fanClubId)
           .eq('status', 'active')
           .order('position', ascending: true)
-          .order('joined_at', ascending: true);
+          .order('joined_at', ascending: true)
+          .limit(300);
 
       final List<dynamic> data = (response as List? ?? []);
       final List<FanClubMember> list = data
@@ -494,8 +497,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           child: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: BottomNavigationBar(
-              currentIndex: _currentTabIndex,
-              onTap: (index) => setState(() => _currentTabIndex = index),
+              currentIndex: _bottomNavIndexFromTab(_currentTabIndex),
+              onTap: (index) => setState(() => _currentTabIndex = _tabIndexFromBottomNav(index)),
               type: BottomNavigationBarType.fixed,
               selectedItemColor: AppColors.primary,
               unselectedItemColor: AppColors.textSecondary,
@@ -505,24 +508,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                   label: 'Feed',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.event_rounded),
-                  label: 'Eventos',
-                ),
-                BottomNavigationBarItem(
                   icon: Icon(Icons.people_rounded),
                   label: 'Membros',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.photo_library_rounded),
-                  label: 'Álbuns',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.shopping_bag_rounded),
-                  label: 'Loja',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.account_balance_wallet_rounded),
-                  label: 'Assinatura',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.emoji_events_rounded),
@@ -530,6 +517,96 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Índice da barra inferior: 0=Feed, 1=Membros, 2=Ranking.
+  int _bottomNavIndexFromTab(int tabIndex) {
+    if (tabIndex == 0) return 0;
+    if (tabIndex == 2) return 1;
+    if (tabIndex == 6) return 2;
+    return 0; // Eventos/Álbuns/Loja/Assinatura: mostrar Feed como selecionado
+  }
+
+  /// Tab index a partir do toque na barra: 0->Feed, 1->Membros, 2->Ranking.
+  int _tabIndexFromBottomNav(int barIndex) {
+    if (barIndex == 0) return 0;
+    if (barIndex == 1) return 2;
+    return 6;
+  }
+
+  /// Botões Eventos, Álbuns, Loja, Assinatura abaixo do banner (apenas no Feed).
+  Widget _buildShortcutButtonsRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildShortcutButton(
+            icon: Icons.event_rounded,
+            label: 'Eventos',
+            onTap: () => setState(() => _currentTabIndex = 1),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildShortcutButton(
+            icon: Icons.photo_library_rounded,
+            label: 'Álbuns',
+            onTap: () => setState(() => _currentTabIndex = 3),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildShortcutButton(
+            icon: Icons.shopping_bag_rounded,
+            label: 'Loja',
+            onTap: () => setState(() => _currentTabIndex = 4),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildShortcutButton(
+            icon: Icons.account_balance_wallet_rounded,
+            label: 'Assinatura',
+            onTap: () => setState(() => _currentTabIndex = 5),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShortcutButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppColors.primary.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 24, color: AppColors.primary),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
@@ -548,9 +625,9 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
         children: [
           // Header da torcida
           _buildFanClubHeader(),
-          const SizedBox(height: 24),
-          // Planos de assinatura – visível para TODOS os membros (incluindo membro comum)
-          _buildPlanosSection(),
+          const SizedBox(height: 16),
+          // Botões Eventos, Álbuns, Loja, Assinatura (acesso rápido abaixo do banner)
+          _buildShortcutButtonsRow(),
           const SizedBox(height: 24),
           // Formulário de criar publicação
           if (_hasPermission('criar_publicacoes') && _authService.userId != null)
@@ -1477,21 +1554,61 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
     );
   }
 
+  /// Lista de membros filtrada pela pesquisa (nome ou apelido).
+  List<FanClubMember> get _filteredMembers {
+    final q = _memberSearchQuery.trim().toLowerCase();
+    if (q.isEmpty) return _members;
+    return _members.where((m) {
+      final profile = _memberProfiles[m.userId];
+      final fullName = (profile?.fullName ?? '').toLowerCase();
+      final nickname = (profile?.nickname ?? '').toLowerCase();
+      return fullName.contains(q) || nickname.contains(q);
+    }).toList();
+  }
+
   Widget _buildMembrosTab() {
+    final filtered = _filteredMembers;
     return RefreshIndicator(
       onRefresh: _loadData,
       color: AppColors.primary,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         children: [
-          // Carteirinha Digital
+          // Carteirinha Digital (membro logado) com tipo de assinatura
           if (_fanClub != null && _member != null && _profile != null)
             DigitalCard(
               member: _member!,
               fanClub: _fanClub!,
               profile: _profile,
+              subscriptionType: _memberSubscription != null && _memberSubscription!.isSubscribed
+                  ? (_memberSubscription!.planName ?? 'Ativa')
+                  : 'Sem assinatura',
             ),
           const SizedBox(height: 24),
+          // Campo de pesquisa
+          TextField(
+            onChanged: (value) => setState(() => _memberSearchQuery = value),
+            decoration: InputDecoration(
+              hintText: 'Pesquisar por nome ou apelido',
+              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary),
+              filled: true,
+              fillColor: AppColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.2)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.2)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -1515,9 +1632,11 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                       child: Icon(Icons.people_rounded, color: AppColors.primary, size: 22),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      'Total de Membros',
-                      style: TextStyle(
+                    Text(
+                      _memberSearchQuery.trim().isEmpty
+                          ? 'Total de Membros'
+                          : 'Resultados',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -1532,7 +1651,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '$_memberCount',
+                    '${filtered.length}${_memberSearchQuery.trim().isEmpty ? '' : ' / ${_members.length}'}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -1544,12 +1663,14 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          if (_members.isEmpty)
+          if (filtered.isEmpty)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
                 child: Text(
-                  'Nenhum membro encontrado.',
+                  _memberSearchQuery.trim().isEmpty
+                      ? 'Nenhum membro encontrado.'
+                      : 'Nenhum membro corresponde à pesquisa.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
@@ -1559,10 +1680,10 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _members.length,
+              itemCount: filtered.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final member = _members[index];
+                final member = filtered[index];
                 final profile = _memberProfiles[member.userId];
                 return _buildMemberTile(member, profile);
               },

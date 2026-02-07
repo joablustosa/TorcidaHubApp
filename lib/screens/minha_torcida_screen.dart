@@ -1042,12 +1042,21 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
     );
   }
 
+  Future<(List<Event>, Map<String, int>)> _loadEventsWithAlbumCounts() async {
+    final events = await EventService.getEvents(
+      fanClubId: widget.fanClubId,
+      userId: _authService.userId,
+    );
+    final ids = events.map((e) => e.id).toList();
+    final albumCounts = ids.isEmpty
+        ? <String, int>{}
+        : await AlbumService.getAlbumCountsForEventIds(ids);
+    return (events, albumCounts);
+  }
+
   Widget _buildEventsList() {
-    return FutureBuilder<List<Event>>(
-      future: EventService.getEvents(
-        fanClubId: widget.fanClubId,
-        userId: _authService.userId,
-      ),
+    return FutureBuilder<(List<Event>, Map<String, int>)>(
+      future: _loadEventsWithAlbumCounts(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Column(
@@ -1122,7 +1131,8 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           );
         }
 
-        final events = snapshot.data ?? [];
+        final events = snapshot.data?.$1 ?? [];
+        final albumCounts = snapshot.data?.$2 ?? <String, int>{};
         final upcomingEvents = events
             .where((e) => e.eventDate.isAfter(DateTime.now()))
             .toList();
@@ -1225,6 +1235,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                       child: EventCard(
                         event: event,
                         isAdmin: _isAdmin,
+                        albumsCount: albumCounts[event.id],
                         overrideUserRegistered: (event.userRegistered ||
                                 _registeredEventIds.contains(event.id)) &&
                             !_cancelledEventIds.contains(event.id),
@@ -1359,6 +1370,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                       child: EventCard(
                         event: event,
                         isAdmin: _isAdmin,
+                        albumsCount: albumCounts[event.id],
                         overrideUserRegistered: (event.userRegistered ||
                                 _registeredEventIds.contains(event.id)) &&
                             !_cancelledEventIds.contains(event.id),

@@ -13,6 +13,8 @@ class EventCard extends StatelessWidget {
   final bool loading;
   /// Sobrescreve event.userRegistered (ex.: após inscrever/cancelar sem recarregar a tela).
   final bool? overrideUserRegistered;
+  /// Quantidade de álbuns associados ao evento (exibido no card quando > 0).
+  final int? albumsCount;
 
   const EventCard({
     super.key,
@@ -23,6 +25,7 @@ class EventCard extends StatelessWidget {
     this.onViewDetails,
     this.loading = false,
     this.overrideUserRegistered,
+    this.albumsCount,
   });
 
   String _formatDate(DateTime date) {
@@ -226,6 +229,13 @@ class EventCard extends StatelessWidget {
                     _buildInfoRow(
                       Icons.people_rounded,
                       '${event.registrationsCount}/${event.maxParticipants} inscritos',
+                    ),
+                  ],
+                  if (albumsCount != null && albumsCount! > 0) ...[
+                    const SizedBox(height: 8),
+                    _buildInfoRow(
+                      Icons.photo_library_rounded,
+                      '$albumsCount ${albumsCount == 1 ? 'álbum' : 'álbuns'}',
                     ),
                   ],
                   if (event.isPaid) ...[

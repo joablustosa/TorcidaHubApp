@@ -3,13 +3,15 @@ import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/supabase_models.dart';
 import '../constants/app_colors.dart';
+import '../services/album_service.dart';
+import '../services/event_service.dart';
+import '../screens/album_detail_screen.dart';
 
 /// Modal de detalhes do evento (adaptado da versão web para mobile).
-/// Exibe título, data, local, descrição, preço, inscritos e ações (inscrever/cancelar).
-class EventDetailsModal extends StatelessWidget {
+/// Exibe título, data, local, descrição, preço, inscritos, álbuns, participantes, check-ins, caravanas e ações.
+class EventDetailsModal extends StatefulWidget {
   final Event event;
   final bool isAdmin;
-  /// Pode ser async; o modal fecha após conclusão.
   final Future<void> Function()? onRegister;
   final Future<void> Function()? onCancelRegistration;
   final VoidCallback onClose;
@@ -55,6 +57,45 @@ class EventDetailsModal extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  State<EventDetailsModal> createState() => _EventDetailsModalState();
+}
+
+class _EventDetailsModalState extends State<EventDetailsModal> {
+  List<Album> _albums = [];
+  List<EventRegistration> _registrations = [];
+  List<Caravan> _caravans = [];
+  bool _loadingDetails = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    final eventId = widget.event.id;
+    try {
+      final results = await Future.wait([
+        AlbumService.getAlbumsForEvent(eventId),
+        EventService.getEventRegistrations(eventId),
+        EventService.getCaravans(eventId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _albums = results[0] as List<Album>;
+          _registrations = results[1] as List<EventRegistration>;
+          _caravans = results[2] as List<Caravan>;
+          _loadingDetails = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingDetails = false);
+    }
+  }
+
+  Event get event => widget.event;
 
   String _formatDate(DateTime date) {
     return DateFormat("d 'de' MMMM 'de' yyyy", 'pt_BR').format(date);
@@ -319,6 +360,152 @@ class EventDetailsModal extends StatelessWidget {
                       ),
                     ],
 
+                    // Álbuns do evento
+                    const SizedBox(height: 20),
+                    _sectionTitle(Icons.photo_library_rounded, 'Álbuns', _albums.length),
+                    if (_loadingDetails)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          ),
+                        ),
+                      )
+                    else if (_albums.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Nenhum álbum associado',
+                          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                        ),
+                      )
+                    else
+                      ...List.generate(_albums.length, (i) {
+                        final album = _albums[i];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => AlbumDetailScreen(
+                                      album: album,
+                                      canUploadPhotos: false,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    if (album.coverPhotoUrl != null && album.coverPhotoUrl!.isNotEmpty)
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: CachedNetworkImage(
+                                          imageUrl: album.coverPhotoUrl!,
+                                          width: 48,
+                                          height: 48,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, __, ___) => _albumPlaceholder(),
+                                        ),
+                                      )
+                                    else
+                                      _albumPlaceholder(),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(album.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                          Text('${album.photoCount} fotos', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+
+                    // Participantes
+                    const SizedBox(height: 20),
+                    _sectionTitle(Icons.people_rounded, 'Participantes', _registrations.length),
+                    if (!_loadingDetails && _registrations.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text('Nenhum participante inscrito', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                      )
+                    else if (!_loadingDetails)
+                      ...List.generate(_registrations.length, (i) {
+                        final r = _registrations[i];
+                        return _participantTile(r);
+                      }),
+
+                    // Check-ins
+                    const SizedBox(height: 20),
+                    _sectionTitle(Icons.check_circle_rounded, 'Check-ins', _registrations.where((r) => r.status == 'checked_in').length),
+                    if (!_loadingDetails && _registrations.where((r) => r.status == 'checked_in').isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text('Nenhum check-in realizado', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                      )
+                    else if (!_loadingDetails)
+                      ..._registrations.where((r) => r.status == 'checked_in').map(_checkInTile).toList(),
+
+                    // Caravanas
+                    const SizedBox(height: 20),
+                    _sectionTitle(Icons.directions_bus_rounded, 'Caravanas', _caravans.length),
+                    if (!_loadingDetails && _caravans.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text('Nenhuma caravana', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                      )
+                    else if (!_loadingDetails)
+                      ...List.generate(_caravans.length, (i) {
+                        final c = _caravans[i];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(c.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  Icon(Icons.location_on_rounded, size: 14, color: AppColors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Expanded(child: Text(c.departureLocation, style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                                ]),
+                                Row(children: [
+                                  Icon(Icons.access_time_rounded, size: 14, color: AppColors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Text(DateFormat('dd/MM HH:mm').format(c.departureTime), style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                  const SizedBox(width: 12),
+                                  Text('${c.maxSeats} vagas', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                  if (c.pricePerSeat > 0) Text(' • R\$ ${c.pricePerSeat.toStringAsFixed(2)}', style: TextStyle(fontSize: 12, color: AppColors.primary)),
+                                ]),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+
                     const SizedBox(height: 24),
 
                     // Ações / status
@@ -326,10 +513,10 @@ class EventDetailsModal extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: loading || onRegister == null
+                          onPressed: widget.loading || widget.onRegister == null
                               ? null
                               : () async {
-                                  await (onRegister?.call() ?? Future<void>.value());
+                                  await (widget.onRegister?.call() ?? Future<void>.value());
                                   if (context.mounted) {
                                     Navigator.of(context).pop();
                                   }
@@ -343,7 +530,7 @@ class EventDetailsModal extends StatelessWidget {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: loading
+                          child: widget.loading
                               ? const SizedBox(
                                   height: 22,
                                   width: 22,
@@ -388,10 +575,10 @@ class EventDetailsModal extends StatelessWidget {
                             ),
                             if (canCancel)
                               TextButton(
-                                onPressed: onCancelRegistration == null
+                                onPressed: widget.onCancelRegistration == null
                                     ? null
                                     : () async {
-                                        await (onCancelRegistration?.call() ?? Future<void>.value());
+                                        await (widget.onCancelRegistration?.call() ?? Future<void>.value());
                                         if (context.mounted) {
                                           Navigator.of(context).pop();
                                         }
@@ -429,12 +616,9 @@ class EventDetailsModal extends StatelessWidget {
 
                     const SizedBox(height: 16),
 
-                    // Botão fechar
+                    // Botão fechar (apenas onClose para evitar duplo pop)
                     OutlinedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        onClose();
-                      },
+                      onPressed: widget.onClose,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
                         side: BorderSide(
@@ -511,6 +695,143 @@ class EventDetailsModal extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _sectionTitle(IconData icon, String title, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text(
+            '$title ($count)',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _albumPlaceholder() {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppColors.textSecondary.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.photo_library_rounded, size: 24, color: AppColors.textSecondary),
+    );
+  }
+
+  Widget _participantTile(EventRegistration r) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.primary.withOpacity(0.2),
+              backgroundImage: r.avatarUrl != null && r.avatarUrl!.isNotEmpty
+                  ? CachedNetworkImageProvider(r.avatarUrl!)
+                  : null,
+              child: r.avatarUrl == null || r.avatarUrl!.isEmpty
+                  ? Text(
+                      (r.fullName.isNotEmpty ? r.fullName[0] : '?').toUpperCase(),
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r.fullName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Row(
+                    children: [
+                      _miniChip(r.paymentStatus == 'paid' ? 'Pago' : 'Pendente', r.paymentStatus == 'paid' ? AppColors.success : AppColors.textSecondary),
+                      if (r.status == 'checked_in') ...[
+                        const SizedBox(width: 6),
+                        _miniChip('Check-in ✓', AppColors.success),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _checkInTile(EventRegistration r) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border(left: BorderSide(color: AppColors.success, width: 4)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.primary.withOpacity(0.2),
+              backgroundImage: r.avatarUrl != null && r.avatarUrl!.isNotEmpty
+                  ? CachedNetworkImageProvider(r.avatarUrl!)
+                  : null,
+              child: r.avatarUrl == null || r.avatarUrl!.isEmpty
+                  ? Text(
+                      (r.fullName.isNotEmpty ? r.fullName[0] : '?').toUpperCase(),
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r.fullName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  if (r.checkInAt != null)
+                    Text(
+                      '${DateFormat('dd/MM/yyyy').format(r.checkInAt!)} às ${DateFormat('HH:mm').format(r.checkInAt!)}${r.checkInByName != null ? ' • por ${r.checkInByName}' : ''}',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                ],
+              ),
+            ),
+            _miniChip('Presente', AppColors.success),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
     );
   }
 }

@@ -218,5 +218,144 @@ class EventService {
       rethrow;
     }
   }
+
+  /// Participantes do evento (inscrições com perfil do usuário).
+  static Future<List<EventRegistration>> getEventRegistrations(
+      String eventId) async {
+    try {
+      final response = await SupabaseService.client
+          .from('event_registrations')
+          .select('id, user_id, status, payment_status, check_in_at, check_in_by')
+          .eq('event_id', eventId)
+          .neq('status', 'cancelled');
+
+      final List<dynamic> regs = (response as List? ?? []);
+      if (regs.isEmpty) return [];
+
+      final userIds = <String>{};
+      for (var r in regs) {
+        final m = r as Map<String, dynamic>;
+        userIds.add(m['user_id'] as String);
+        final checkInBy = m['check_in_by'];
+        if (checkInBy != null) userIds.add(checkInBy as String);
+      }
+
+      final profilesRes = await SupabaseService.client
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .inFilter('id', userIds.toList());
+
+      final profileMap = <String, Map<String, dynamic>>{};
+      for (var p in (profilesRes as List? ?? [])) {
+        final m = Map<String, dynamic>.from(p as Map);
+        profileMap[m['id'] as String] = m;
+      }
+
+      return regs.map((r) {
+        final m = Map<String, dynamic>.from(r as Map);
+        final uid = m['user_id'] as String;
+        final profile = profileMap[uid] ?? {'id': uid, 'full_name': 'Usuário', 'avatar_url': null};
+        return EventRegistration(
+          id: m['id'] as String,
+          userId: uid,
+          status: m['status'] as String? ?? '',
+          paymentStatus: m['payment_status'] as String? ?? '',
+          checkInAt: m['check_in_at'] != null
+              ? DateTime.parse(m['check_in_at'] as String)
+              : null,
+          checkInBy: m['check_in_by'] as String?,
+          fullName: profile['full_name'] as String? ?? 'Usuário',
+          avatarUrl: profile['avatar_url'] as String?,
+          checkInByName: profileMap[m['check_in_by'] as String?]?['full_name'] as String?,
+        );
+      }).toList();
+    } catch (e) {
+      print('Erro ao buscar participantes: $e');
+      return [];
+    }
+  }
+
+  /// Caravanas do evento.
+  static Future<List<Caravan>> getCaravans(String eventId) async {
+    try {
+      final response = await SupabaseService.client
+          .from('caravans')
+          .select()
+          .eq('event_id', eventId)
+          .neq('status', 'cancelled');
+
+      final List<dynamic> data = (response as List? ?? []);
+      return data
+          .map((item) => Caravan.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } catch (e) {
+      print('Erro ao buscar caravanas: $e');
+      return [];
+    }
+  }
+}
+
+/// Inscrição no evento com dados do usuário (para o modal de detalhes).
+class EventRegistration {
+  final String id;
+  final String userId;
+  final String status;
+  final String paymentStatus;
+  final DateTime? checkInAt;
+  final String? checkInBy;
+  final String fullName;
+  final String? avatarUrl;
+  final String? checkInByName;
+
+  EventRegistration({
+    required this.id,
+    required this.userId,
+    required this.status,
+    required this.paymentStatus,
+    this.checkInAt,
+    this.checkInBy,
+    required this.fullName,
+    this.avatarUrl,
+    this.checkInByName,
+  });
+}
+
+/// Caravana (viagem associada ao evento).
+class Caravan {
+  final String id;
+  final String eventId;
+  final String name;
+  final String departureLocation;
+  final DateTime departureTime;
+  final int maxSeats;
+  final double pricePerSeat;
+  final String? vehicleType;
+  final String? status;
+
+  Caravan({
+    required this.id,
+    required this.eventId,
+    required this.name,
+    required this.departureLocation,
+    required this.departureTime,
+    required this.maxSeats,
+    this.pricePerSeat = 0,
+    this.vehicleType,
+    this.status,
+  });
+
+  factory Caravan.fromJson(Map<String, dynamic> json) {
+    return Caravan(
+      id: json['id'] as String,
+      eventId: json['event_id'] as String,
+      name: json['name'] as String,
+      departureLocation: json['departure_location'] as String,
+      departureTime: DateTime.parse(json['departure_time'] as String),
+      maxSeats: json['max_seats'] as int? ?? 0,
+      pricePerSeat: (json['price_per_seat'] as num?)?.toDouble() ?? 0,
+      vehicleType: json['vehicle_type'] as String?,
+      status: json['status'] as String?,
+    );
+  }
 }
 

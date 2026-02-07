@@ -68,6 +68,63 @@ class AlbumPhoto {
 }
 
 class AlbumService {
+  /// Álbuns vinculados a um evento (para exibir no modal de detalhes do evento).
+  static Future<List<Album>> getAlbumsForEvent(String eventId) async {
+    try {
+      final response = await SupabaseService.client
+          .from('photo_albums')
+          .select()
+          .eq('event_id', eventId)
+          .order('created_at', ascending: false);
+
+      final List<dynamic> data = (response as List? ?? []);
+      List<Album> albums = [];
+
+      for (var item in data) {
+        final albumData = Map<String, dynamic>.from(item);
+        try {
+          final photosResponse = await SupabaseService.client
+              .from('album_photos')
+              .select('id')
+              .eq('album_id', albumData['id'].toString());
+          albumData['photo_count'] =
+              ((photosResponse as List? ?? []) as List).length;
+        } catch (e) {
+          albumData['photo_count'] = 0;
+        }
+        albums.add(Album.fromJson(albumData));
+      }
+      return albums;
+    } catch (e) {
+      print('Erro ao buscar álbuns do evento: $e');
+      return [];
+    }
+  }
+
+  /// Retorna contagem de álbuns por event_id (para exibir no card do evento).
+  static Future<Map<String, int>> getAlbumCountsForEventIds(
+      List<String> eventIds) async {
+    if (eventIds.isEmpty) return {};
+    try {
+      final response = await SupabaseService.client
+          .from('photo_albums')
+          .select('event_id')
+          .inFilter('event_id', eventIds);
+
+      final List<dynamic> data = (response as List? ?? []);
+      final Map<String, int> counts = {};
+      for (var item in data) {
+        final map = item as Map<String, dynamic>;
+        final eid = map['event_id'] as String?;
+        if (eid != null) counts[eid] = (counts[eid] ?? 0) + 1;
+      }
+      return counts;
+    } catch (e) {
+      print('Erro ao contar álbuns por evento: $e');
+      return {};
+    }
+  }
+
   static Future<List<Album>> getAlbums(String fanClubId) async {
     try {
       final response = await SupabaseService.client

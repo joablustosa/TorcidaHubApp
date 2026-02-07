@@ -15,6 +15,7 @@ import '../services/permissions_service.dart';
 import '../services/subscription_service.dart';
 import '../widgets/comment_section.dart';
 import '../widgets/create_event_dialog.dart';
+import '../widgets/event_details_modal.dart';
 import '../widgets/create_album_dialog.dart';
 import '../widgets/pix_payment_dialog.dart';
 import '../widgets/store_section.dart';
@@ -1325,9 +1326,11 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                       }
                     }
                   },
-                  onViewDetails: () {
-                    // TODO: Implementar detalhes do evento
-                  },
+                  onViewDetails: () => _showEventDetailsModal(
+                    context,
+                    event,
+                    isUpcoming: true,
+                  ),
                 ),
                     );
                   },
@@ -1359,9 +1362,11 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                         overrideUserRegistered: (event.userRegistered ||
                                 _registeredEventIds.contains(event.id)) &&
                             !_cancelledEventIds.contains(event.id),
-                        onViewDetails: () {
-                          // TODO: Implementar detalhes do evento
-                        },
+                        onViewDetails: () => _showEventDetailsModal(
+                          context,
+                          event,
+                          isUpcoming: false,
+                        ),
                       ),
                     );
                   },
@@ -1371,6 +1376,120 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           ],
         );
       },
+    );
+  }
+
+  void _showEventDetailsModal(
+    BuildContext context,
+    Event event, {
+    required bool isUpcoming,
+  }) {
+    final userRegistered = (event.userRegistered ||
+            _registeredEventIds.contains(event.id)) &&
+        !_cancelledEventIds.contains(event.id);
+
+    EventDetailsModal.show(
+      context,
+      event: event,
+      isAdmin: _isAdmin,
+      overrideUserRegistered: userRegistered,
+      onRegister: isUpcoming
+          ? () async {
+              try {
+                final paymentData = await EventService.registerForEvent(
+                  eventId: event.id,
+                  userId: _authService.userId!,
+                );
+                if (!mounted) return;
+                setState(() {
+                  _registeredEventIds.add(event.id);
+                  _cancelledEventIds.remove(event.id);
+                });
+                if (event.isPaid && paymentData != null) {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => PixPaymentDialog(
+                      orderId: paymentData['order_id'] as String? ?? '',
+                      qrCode: paymentData['qr_code'] as String? ?? '',
+                      qrCodeUrl: paymentData['qr_code_url'] as String?,
+                      expiresAt: paymentData['expires_at'] != null
+                          ? DateTime.parse(
+                              paymentData['expires_at'] as String,
+                            )
+                          : DateTime.now().add(const Duration(minutes: 30)),
+                      baseAmount: event.price,
+                      fee: event.price * 0.0499,
+                      total: event.price + (event.price * 0.0499),
+                      itemName: event.title,
+                      onPaymentConfirmed: () {},
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Inscrição realizada com sucesso!'),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (!mounted) return;
+                final msg = e.toString();
+                final isAlreadyRegistered = msg.contains('ALREADY_REGISTERED');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isAlreadyRegistered
+                          ? 'Você já está inscrito neste evento.'
+                          : 'Erro ao se inscrever: $msg',
+                    ),
+                    backgroundColor: isAlreadyRegistered
+                        ? AppColors.primary
+                        : AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                if (isAlreadyRegistered) {
+                  setState(() {
+                    _registeredEventIds.add(event.id);
+                    _cancelledEventIds.remove(event.id);
+                  });
+                }
+              }
+            }
+          : null,
+      onCancelRegistration: isUpcoming
+          ? () async {
+              try {
+                await EventService.cancelRegistration(
+                  eventId: event.id,
+                  userId: _authService.userId!,
+                );
+                if (!mounted) return;
+                setState(() {
+                  _registeredEventIds.remove(event.id);
+                  _cancelledEventIds.add(event.id);
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Inscrição cancelada'),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erro ao cancelar: $e'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            }
+          : null,
     );
   }
 

@@ -4,6 +4,7 @@ import '../services/membership_service.dart';
 import '../services/auth_service_supabase.dart';
 import '../services/supabase_service.dart';
 import '../constants/app_colors.dart';
+import '../screens/perfil_screen.dart';
 import 'pix_payment_dialog.dart';
 
 const double _platformFeePercent = 5;
@@ -65,11 +66,22 @@ class _MembershipPaymentDialogState extends State<MembershipPaymentDialog> {
       final plans =
           await MembershipService.getPlans(widget.fanClubId);
 
-      final profile = await SupabaseService.client
+      final publicProfile = await SupabaseService.client
           .from('profiles')
-          .select('full_name, phone, cpf')
+          .select('full_name')
           .eq('id', _authService.userId!)
           .maybeSingle();
+
+      Map<String, dynamic>? privateProfile;
+      try {
+        privateProfile = await SupabaseService.client
+            .from('profiles_private')
+            .select('cpf, phone')
+            .eq('user_id', _authService.userId!)
+            .maybeSingle();
+      } catch (_) {
+        privateProfile = null;
+      }
 
       if (mounted) {
         setState(() {
@@ -79,9 +91,9 @@ class _MembershipPaymentDialogState extends State<MembershipPaymentDialog> {
                     (p) => p?.isDefault ?? false,
                     orElse: () => plans.isNotEmpty ? plans.first : null,
                   );
-          _profileName = profile?['full_name'] as String? ?? '';
-          _profilePhone = profile?['phone'] as String?;
-          _profileCpf = profile?['cpf'] as String?;
+          _profileName = publicProfile?['full_name'] as String? ?? '';
+          _profilePhone = privateProfile?['phone'] as String?;
+          _profileCpf = privateProfile?['cpf'] as String?;
           _loading = false;
           _pixData = null;
         });
@@ -119,11 +131,31 @@ class _MembershipPaymentDialogState extends State<MembershipPaymentDialog> {
   Future<void> _handleCreatePayment() async {
     if (_selectedPlan == null) return;
     if ((_profileName ?? '').trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preencha seu nome no perfil'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
+      final nav = Navigator.of(context);
+      final overlayContext = nav.overlay?.context ?? context;
+      showDialog(
+        context: overlayContext,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Complete seu cadastro'),
+          content: const Text(
+            'Para gerar o PIX da assinatura, você precisa preencher seu nome no perfil.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Agora não'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                widget.onOpenChange(false);
+                nav.push(
+                  MaterialPageRoute(builder: (_) => const PerfilScreen()),
+                );
+              },
+              child: const Text('Ir para meu perfil'),
+            ),
+          ],
         ),
       );
       return;
@@ -151,11 +183,19 @@ class _MembershipPaymentDialogState extends State<MembershipPaymentDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _processing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        final nav = Navigator.of(context);
+        final overlayContext = nav.overlay?.context ?? context;
+        showDialog(
+          context: overlayContext,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Erro ao gerar PIX'),
             content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Fechar'),
+              ),
+            ],
           ),
         );
       }

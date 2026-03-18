@@ -109,11 +109,17 @@ class _ProductCheckoutDialogState extends State<ProductCheckoutDialog> {
   Future<void> _handleCheckout(BuildContext dialogContext) async {
     final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
     if (phone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Informe seu telefone para contato'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
+      showDialog(
+        context: dialogContext,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Dados incompletos'),
+          content: const Text('Informe seu telefone para contato para continuar com o pagamento via PIX.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Ok'),
+            ),
+          ],
         ),
       );
       return;
@@ -124,11 +130,17 @@ class _ProductCheckoutDialogState extends State<ProductCheckoutDialog> {
       final city = _cityController.text.trim();
       final state = _stateController.text.trim();
       if (addr.isEmpty || city.isEmpty || state.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Preencha o endereço de entrega'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
+        showDialog(
+          context: dialogContext,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Endereço incompleto'),
+            content: const Text('Preencha o endereço de entrega (rua, cidade e estado).'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Ok'),
+              ),
+            ],
           ),
         );
         return;
@@ -217,13 +229,19 @@ class _ProductCheckoutDialogState extends State<ProductCheckoutDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        showDialog(
+          context: dialogContext,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Erro ao gerar PIX'),
             content: Text(
               e.toString().replaceAll('Exception: ', ''),
             ),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Fechar'),
+              ),
+            ],
           ),
         );
       }

@@ -137,7 +137,7 @@ class _EventDetailsModalState extends State<EventDetailsModal> {
 
   @override
   Widget build(BuildContext context) {
-    final userRegistered = overrideUserRegistered ?? event.userRegistered;
+    final userRegistered = widget.overrideUserRegistered ?? event.userRegistered;
     final isPast = event.eventDate.isBefore(DateTime.now());
     final isDeadlinePassed = event.registrationDeadline != null &&
         event.registrationDeadline!.isBefore(DateTime.now());

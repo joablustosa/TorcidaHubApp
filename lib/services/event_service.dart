@@ -136,12 +136,12 @@ class EventService {
     }
   }
 
+  /// Alinhado com web-version: evento gratuito = insert/upsert; evento pago = só chama create-woovi-payment (a edge function cria o registro).
   static Future<Map<String, dynamic>?> registerForEvent({
     required String eventId,
     required String userId,
   }) async {
     try {
-      // Buscar informações do evento
       final eventResponse = await SupabaseService.client
           .from('events')
           .select()
@@ -155,47 +155,56 @@ class EventService {
       final eventData = Map<String, dynamic>.from(eventResponse);
       final isPaid = eventData['is_paid'] as bool? ?? false;
       final price = (eventData['price'] as num?)?.toDouble() ?? 0.0;
+      final fanClubId = eventData['fan_club_id'] as String?;
 
-      // Criar registro
-      final registrationResponse = await SupabaseService.client
-          .from('event_registrations')
-          .insert({
-        'event_id': eventId,
-        'user_id': userId,
-        'status': isPaid ? 'pending_payment' : 'confirmed',
-        'payment_status': isPaid ? 'pending' : 'paid',
-      }).select().single();
+      if (isPaid && price > 0 && fanClubId != null) {
+        // Evento pago: apenas chamar a edge function (como na web). Ela cria o registro e retorna PIX.
+        final response = await SupabaseService.client.functions.invoke(
+          'create-woovi-payment',
+          body: {
+            'type': 'event',
+            'id': eventId,
+            'fan_club_id': fanClubId,
+          },
+        );
 
-      if (registrationResponse == null) {
-        throw Exception('Erro ao criar registro');
+        if (response.status != 200) {
+          final err = response.data;
+          final msg = err is Map && err['error'] != null
+              ? err['error'].toString()
+              : 'Erro ao gerar pagamento (${response.status})';
+          throw Exception(msg);
+        }
+
+        final data = response.data;
+        if (data is Map && data['pix'] != null) {
+          return Map<String, dynamic>.from(data);
+        }
+        throw Exception('Resposta do pagamento inválida');
       }
 
-      // Se for evento pago, criar pagamento PIX
-      if (isPaid && price > 0) {
-        try {
-          // Chamar função RPC para criar pagamento PIX
-          final paymentResponse = await SupabaseService.client.rpc(
-            'create_pix_payment',
-            params: {
-              'p_event_id': eventId,
-              'p_user_id': userId,
-              'p_amount': price,
-            },
-          );
-
-          if (paymentResponse != null) {
-            return Map<String, dynamic>.from(paymentResponse);
-          }
-        } catch (e) {
-          print('Erro ao criar pagamento PIX: $e');
-          // Continuar mesmo se falhar (pode ser que a função RPC não exista ainda)
+      // Evento gratuito: upsert no event_registrations (como na web)
+      try {
+        await SupabaseService.client.from('event_registrations').upsert(
+          {
+            'event_id': eventId,
+            'user_id': userId,
+            'status': 'confirmed',
+            'payment_status': 'paid',
+          },
+          onConflict: 'event_id,user_id',
+        );
+      } catch (e) {
+        if (e.toString().contains('23505') || e.toString().toLowerCase().contains('duplicate key')) {
+          throw Exception('ALREADY_REGISTERED');
         }
+        rethrow;
       }
 
       return null;
     } catch (e) {
       final msg = e.toString();
-      if (msg.contains('23505') || msg.toLowerCase().contains('duplicate key')) {
+      if (msg.contains('ALREADY_REGISTERED') || msg.contains('23505') || msg.toLowerCase().contains('duplicate key')) {
         throw Exception('ALREADY_REGISTERED');
       }
       print('Erro ao se inscrever no evento: $e');

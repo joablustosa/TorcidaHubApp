@@ -12,6 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 WEB App/
+web-version
 
 # IntelliJ related
 *.iml

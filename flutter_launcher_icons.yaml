@@ -6,4 +6,6 @@ flutter_launcher_icons:
   image_path: "assets/icon_launcher.png"
   adaptive_icon_background: "#E8F5E9"
   adaptive_icon_foreground: "assets/icon_launcher.png"
-  adaptive_icon_foreground_inset: 0
+  # Aumenta a “margem” em torno da logo no ícone adaptativo
+  # (0 = ocupa tudo, valores maiores colocam padding e evitam aparência esticada/cortada).
+  adaptive_icon_foreground_inset: 18

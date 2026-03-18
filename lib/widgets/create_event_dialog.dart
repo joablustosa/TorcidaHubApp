@@ -158,7 +158,7 @@ class _CreateEventDialogState extends State<CreateEventDialog> {
         );
       }
 
-      await SupabaseService.client.from('events').insert({
+      final eventPayload = <String, dynamic>{
         'fan_club_id': widget.fanClubId,
         'created_by': _authService.userId,
         'title': _titleController.text.trim(),
@@ -182,7 +182,13 @@ class _CreateEventDialogState extends State<CreateEventDialog> {
             ? double.tryParse(_priceController.text.trim()) ?? 0.0
             : 0.0,
         'registration_deadline': _registrationDeadline?.toIso8601String(),
-      });
+        'status': 'published',
+      };
+      try {
+        await SupabaseService.client.from('events').insert({...eventPayload, 'members_only': false});
+      } catch (_) {
+        await SupabaseService.client.from('events').insert(eventPayload);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

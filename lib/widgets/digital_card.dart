@@ -209,18 +209,12 @@ class DigitalCard extends StatelessWidget {
     String? subscriptionType,
   }) {
     const double avatarSize = 72;
-    // Uma linha: [foto+logo empilhados] | nome+detalhes | QR grande (mesma altura, sem aumentar o card)
+    const double logoSize = 72;
+    // Uma linha: avatar | nome+detalhes | logo (centro) | QR
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildAvatarColumn(displayName: displayName, avatarUrl: avatarUrl, size: avatarSize),
-            const SizedBox(height: 4),
-            _buildLogoOnly(avatarSize),
-          ],
-        ),
+        _buildAvatarColumn(displayName: displayName, avatarUrl: avatarUrl, size: avatarSize),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -240,6 +234,10 @@ class DigitalCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
+        Center(
+          child: _buildLogoOnly(logoSize),
+        ),
+        const SizedBox(width: 12),
         _buildQRSection(size: 110, compact: true),
       ],
     );
@@ -257,7 +255,7 @@ class DigitalCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Primeira linha: foto + nome/apelido + QR (posição original)
+        // Primeira linha: foto + nome/apelido + QR
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -278,20 +276,15 @@ class DigitalCard extends StatelessWidget {
             _buildQRSection(size: 72, compact: true),
           ],
         ),
-        const SizedBox(height: 4),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildLogoOnly(size),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildMemberDetailsVertical(
-                joinDate: joinDate,
-                subscriptionType: subscriptionType,
-              ),
-            ),
-          ],
+        const SizedBox(height: 8),
+        // Logo fixo no meio do card
+        Center(
+          child: _buildLogoOnly(size),
+        ),
+        const SizedBox(height: 8),
+        _buildMemberDetailsVertical(
+          joinDate: joinDate,
+          subscriptionType: subscriptionType,
         ),
       ],
     );

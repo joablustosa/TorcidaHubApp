@@ -7,6 +7,14 @@ class Profile {
   final String? avatarUrl;
   final String? email;
   final bool? emailVerified;
+  /// Telefone de contato cadastrado no perfil.
+  final String? phone;
+  /// Cidade cadastrada no perfil.
+  final String? city;
+  /// Estado (UF) cadastrado no perfil.
+  final String? state;
+  /// CPF cadastrado no perfil.
+  final String? cpf;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -17,6 +25,10 @@ class Profile {
     this.avatarUrl,
     this.email,
     this.emailVerified,
+    this.phone,
+    this.city,
+    this.state,
+    this.cpf,
     this.createdAt,
     this.updatedAt,
   });
@@ -29,7 +41,11 @@ class Profile {
       avatarUrl: json['avatar_url'] as String?,
       email: json['email'] as String?,
       emailVerified: json['email_verified'] as bool?,
-      createdAt: json['created_at'] != null 
+      phone: json['phone'] as String?,
+      city: json['city'] as String?,
+      state: json['state'] as String?,
+      cpf: json['cpf'] as String?,
+      createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
       updatedAt: json['updated_at'] != null
@@ -46,6 +62,10 @@ class Profile {
       'avatar_url': avatarUrl,
       'email': email,
       'email_verified': emailVerified,
+      'phone': phone,
+      'city': city,
+      'state': state,
+      'cpf': cpf,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };

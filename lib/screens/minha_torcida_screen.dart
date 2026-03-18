@@ -21,6 +21,7 @@ import '../widgets/pix_payment_dialog.dart';
 import '../widgets/store_section.dart';
 import '../widgets/membership_section.dart';
 import '../services/membership_service.dart';
+import '../services/store_service.dart';
 import 'album_detail_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -67,6 +68,9 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
   MembershipAccessConfig? _accessSettings;
   MemberSubscription? _memberSubscription;
   Future<List<SubscriptionPlan>>? _plansFuture;
+  int? _upcomingEventsCount;
+  int? _albumsCount;
+  int? _storeProductsCount;
 
   @override
   void initState() {
@@ -78,6 +82,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
       currentUserId: _authService.userId,
     );
     _loadData();
+    _loadShortcutCounts();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is Map<String, dynamic> &&
@@ -111,6 +116,39 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadShortcutCounts() async {
+    try {
+      final now = DateTime.now();
+      final events = await EventService.getEvents(
+        fanClubId: widget.fanClubId,
+        userId: _authService.userId,
+      );
+      final upcoming = events
+          .where((e) => e.eventDate.isAfter(now) || e.eventDate.isAtSameMomentAs(now))
+          .length;
+
+      final albums = await AlbumService.getAlbums(widget.fanClubId);
+      final products = await StoreService.getProducts(widget.fanClubId);
+
+      if (mounted) {
+        setState(() {
+          _upcomingEventsCount = upcoming;
+          _albumsCount = albums.length;
+          _storeProductsCount = products.length;
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar contadores do atalho: $e');
+      if (mounted) {
+        setState(() {
+          _upcomingEventsCount = null;
+          _albumsCount = null;
+          _storeProductsCount = null;
         });
       }
     }
@@ -539,6 +577,16 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
     return 6;
   }
 
+  DateTime _parseExpiresAt(dynamic value) {
+    if (value == null) return DateTime.now().add(const Duration(minutes: 30));
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {}
+    }
+    return DateTime.now().add(const Duration(minutes: 30));
+  }
+
   /// Botões Eventos, Álbuns, Loja, Assinatura abaixo do banner (apenas no Feed).
   Widget _buildShortcutButtonsRow() {
     return Row(
@@ -547,6 +595,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           child: _buildShortcutButton(
             icon: Icons.event_rounded,
             label: 'Eventos',
+            count: _upcomingEventsCount,
             onTap: () => setState(() => _currentTabIndex = 1),
           ),
         ),
@@ -555,6 +604,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           child: _buildShortcutButton(
             icon: Icons.photo_library_rounded,
             label: 'Álbuns',
+            count: _albumsCount,
             onTap: () => setState(() => _currentTabIndex = 3),
           ),
         ),
@@ -563,6 +613,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
           child: _buildShortcutButton(
             icon: Icons.shopping_bag_rounded,
             label: 'Loja',
+            count: _storeProductsCount,
             onTap: () => setState(() => _currentTabIndex = 4),
           ),
         ),
@@ -581,32 +632,72 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
   Widget _buildShortcutButton({
     required IconData icon,
     required String label,
+    int? count,
     required VoidCallback onTap,
   }) {
+    final showBadge = count != null && count > 0;
+    const double cardHeight = 76;
     return Material(
       color: AppColors.primary.withOpacity(0.08),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: SizedBox(
+          height: cardHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Icon(icon, size: 24, color: AppColors.primary),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+              Positioned.fill(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 24, color: AppColors.primary),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+                ),
               ),
+              if (showBadge)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      count > 99 ? '99+' : '$count',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -618,6 +709,7 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
     return RefreshIndicator(
       onRefresh: () async {
         await _loadData();
+        await _loadShortcutCounts();
         _refreshPosts();
       },
       color: AppColors.primary,
@@ -1252,19 +1344,19 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                           _cancelledEventIds.remove(event.id);
                         });
                         if (event.isPaid && paymentData != null) {
+                          final pix = paymentData['pix'] as Map<String, dynamic>?;
+                          final amounts = paymentData['amounts'] as Map<String, dynamic>?;
                           showDialog(
                             context: context,
                             builder: (context) => PixPaymentDialog(
                               orderId: paymentData['order_id'] as String? ?? '',
-                              qrCode: paymentData['qr_code'] as String? ?? '',
-                              qrCodeUrl: paymentData['qr_code_url'] as String?,
-                              expiresAt: paymentData['expires_at'] != null
-                                  ? DateTime.parse(paymentData['expires_at'] as String)
-                                  : DateTime.now().add(const Duration(minutes: 30)),
-                              baseAmount: event.price,
-                              fee: (event.price * 0.0499),
-                              total: event.price + (event.price * 0.0499),
-                              itemName: event.title,
+                              qrCode: (pix?['qr_code'] ?? paymentData['qr_code']) as String? ?? '',
+                              qrCodeUrl: (pix?['qr_code_url'] ?? paymentData['qr_code_url']) as String?,
+                              expiresAt: _parseExpiresAt(pix?['expires_at'] ?? paymentData['expires_at']),
+                              baseAmount: (amounts?['base'] as num?)?.toDouble() ?? event.price,
+                              fee: (amounts?['platform_fee'] as num?)?.toDouble() ?? (event.price * 0.05),
+                              total: (amounts?['total'] as num?)?.toDouble() ?? event.price,
+                              itemName: paymentData['item_name'] as String? ?? event.title,
                               onPaymentConfirmed: () {
                                 // Sem recarregar a tela; estado local já atualizado
                               },
@@ -1418,21 +1510,19 @@ class _MinhaTorcidaScreenState extends State<MinhaTorcidaScreen> {
                   _cancelledEventIds.remove(event.id);
                 });
                 if (event.isPaid && paymentData != null) {
+                  final pix = paymentData['pix'] as Map<String, dynamic>?;
+                  final amounts = paymentData['amounts'] as Map<String, dynamic>?;
                   showDialog(
                     context: context,
                     builder: (ctx) => PixPaymentDialog(
                       orderId: paymentData['order_id'] as String? ?? '',
-                      qrCode: paymentData['qr_code'] as String? ?? '',
-                      qrCodeUrl: paymentData['qr_code_url'] as String?,
-                      expiresAt: paymentData['expires_at'] != null
-                          ? DateTime.parse(
-                              paymentData['expires_at'] as String,
-                            )
-                          : DateTime.now().add(const Duration(minutes: 30)),
-                      baseAmount: event.price,
-                      fee: event.price * 0.0499,
-                      total: event.price + (event.price * 0.0499),
-                      itemName: event.title,
+                      qrCode: (pix?['qr_code'] ?? paymentData['qr_code']) as String? ?? '',
+                      qrCodeUrl: (pix?['qr_code_url'] ?? paymentData['qr_code_url']) as String?,
+                      expiresAt: _parseExpiresAt(pix?['expires_at'] ?? paymentData['expires_at']),
+                      baseAmount: (amounts?['base'] as num?)?.toDouble() ?? event.price,
+                      fee: (amounts?['platform_fee'] as num?)?.toDouble() ?? (event.price * 0.05),
+                      total: (amounts?['total'] as num?)?.toDouble() ?? event.price,
+                      itemName: paymentData['item_name'] as String? ?? event.title,
                       onPaymentConfirmed: () {},
                     ),
                   );

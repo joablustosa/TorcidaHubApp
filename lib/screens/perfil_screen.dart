@@ -52,22 +52,50 @@ class _PerfilScreenState extends State<PerfilScreen> {
     });
 
     try {
-      final response = await SupabaseService.client
-          .from('profiles')
-          .select()
-          .eq('id', _authService.userId!)
-          .maybeSingle();
+      // Alinha com a WEB: dados públicos em profiles, dados sensíveis em profiles_private.
+      // Usar select('*') para não falhar se alguma coluna (ex: city, state) não existir no projeto.
+      Map<String, dynamic>? publicResponse;
+      try {
+        final res = await SupabaseService.client
+            .from('profiles')
+            .select()
+            .eq('id', _authService.userId!)
+            .maybeSingle();
+        publicResponse = res != null ? Map<String, dynamic>.from(res as Map) : null;
+      } catch (e) {
+        print('Erro ao carregar profiles: $e');
+        publicResponse = null;
+      }
 
-      if (response != null) {
-        final profile = Profile.fromJson(Map<String, dynamic>.from(response));
+      Map<String, dynamic>? privateResponse;
+      try {
+        final res = await SupabaseService.client
+            .from('profiles_private')
+            .select('cpf, phone')
+            .eq('user_id', _authService.userId!)
+            .maybeSingle();
+        privateResponse = res != null ? Map<String, dynamic>.from(res as Map) : null;
+      } catch (_) {
+        privateResponse = null;
+      }
+
+      if (publicResponse != null) {
+        final merged = {
+          ...publicResponse,
+          if (privateResponse != null) ...{
+            'cpf': privateResponse['cpf'],
+            'phone': privateResponse['phone'],
+          },
+        };
+        final profile = Profile.fromJson(merged);
         setState(() {
           _profile = profile;
           _nameController.text = profile.fullName ?? '';
           _nicknameController.text = profile.nickname ?? '';
-          _phoneController.text = '';
-          _cityController.text = '';
-          _cpfController.text = '';
-          _selectedState = '';
+          _phoneController.text = profile.phone ?? '';
+          _cityController.text = profile.city ?? '';
+          _cpfController.text = profile.cpf ?? '';
+          _selectedState = profile.state ?? '';
           _avatarUrl = profile.avatarUrl;
         });
       }
@@ -178,6 +206,18 @@ class _PerfilScreenState extends State<PerfilScreen> {
     });
 
     try {
+      final phoneClean = _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim();
+      final cityClean = _cityController.text.trim().isEmpty
+          ? null
+          : _cityController.text.trim();
+      final stateClean = _selectedState.isEmpty ? null : _selectedState;
+      final cpfClean = _cpfController.text.trim().isEmpty
+          ? null
+          : _cpfController.text.trim().replaceAll(RegExp(r'\D'), '');
+
+      // Atualiza perfil público
       await SupabaseService.client
           .from('profiles')
           .update({
@@ -185,18 +225,21 @@ class _PerfilScreenState extends State<PerfilScreen> {
             'nickname': _nicknameController.text.trim().isEmpty
                 ? null
                 : _nicknameController.text.trim(),
-            'phone': _phoneController.text.trim().isEmpty
-                ? null
-                : _phoneController.text.trim(),
-            'city': _cityController.text.trim().isEmpty
-                ? null
-                : _cityController.text.trim(),
-            'state': _selectedState.isEmpty ? null : _selectedState,
-            'cpf': _cpfController.text.trim().isEmpty
-                ? null
-                : _cpfController.text.trim().replaceAll(RegExp(r'\D'), ''),
+            'city': cityClean,
+            'state': stateClean,
           })
           .eq('id', _authService.userId!);
+
+      // Atualiza/insere dados privados (pode não existir em alguns ambientes)
+      try {
+        await SupabaseService.client.from('profiles_private').upsert({
+          'user_id': _authService.userId!,
+          'phone': phoneClean,
+          'cpf': cpfClean,
+        });
+      } catch (_) {
+        // Ignora em ambientes onde profiles_private ainda não existe.
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
